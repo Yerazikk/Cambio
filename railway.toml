@@ -1,0 +1,7 @@
+# Railway configuration for client deployment
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+buildCommand = "npm run build --workspace=client"
+startCommand = "npm run start --workspace=client"
