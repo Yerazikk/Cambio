@@ -46,3 +46,10 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+playwright/.cache/

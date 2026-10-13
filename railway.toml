@@ -1,7 +1,11 @@
-# Railway configuration for client deployment
+# One service: the Node server builds the client and then serves it alongside
+# the WebSocket endpoint, so the page and its socket always share an origin.
 [build]
 builder = "NIXPACKS"
+buildCommand = "npm ci && npm run build"
 
 [deploy]
-buildCommand = "npm run build --workspace=client"
-startCommand = "npm run start --workspace=client"
+startCommand = "npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"

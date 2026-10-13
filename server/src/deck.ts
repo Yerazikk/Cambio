@@ -1,21 +1,32 @@
-export type Card = { id: string; value: number; points: number; displayName: string };
+import { NUMERIC_RANKS, SUITS, makeCard, type Card } from "@cambio/shared";
+import type { Rng } from "./rng.js";
 
-export function genStandard52(): Card[] {
-  const suits = ["♠","♥","♦","♣"];
-  const cards: Card[] = [];
-  for (const s of suits) {
-    for (let v = 1; v <= 13; v++) {
-      const id = `${s}${v}`;
-      cards.push({ id, value: v, points: Math.min(v, 10), displayName: `${v}${s}` });
-    }
-  }
-  return shuffle(cards);
-}
-
-function shuffle<T>(a: T[]): T[] {
+/** Fisher-Yates. Returns a new array; the input is left untouched. */
+export function shuffle<T>(input: readonly T[], rng: Rng): T[] {
+  const a = [...input];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+    const j = Math.floor(rng() * (i + 1));
+    const ai = a[i] as T;
+    const aj = a[j] as T;
+    a[i] = aj;
+    a[j] = ai;
   }
   return a;
+}
+
+/** An unshuffled 54-card Cambio deck: 52 standard cards plus two jokers. */
+export function orderedCambioDeck(): Card[] {
+  const cards: Card[] = [];
+  for (const suit of SUITS) {
+    for (const rank of NUMERIC_RANKS) {
+      cards.push(makeCard(rank, suit, `${suit}${rank}`));
+    }
+  }
+  cards.push(makeCard("joker", null, "X0"));
+  cards.push(makeCard("joker", null, "X1"));
+  return cards;
+}
+
+export function genCambioDeck(rng: Rng): Card[] {
+  return shuffle(orderedCambioDeck(), rng);
 }
