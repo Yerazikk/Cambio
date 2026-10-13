@@ -39,11 +39,11 @@ export function GameOver({ view, me, onRestart, onLeave }: GameOverProps): React
       <div className="over__actions">
         {amHost ? (
           <button type="button" className="button button--primary" onClick={onRestart} data-testid="play-again">
-            Deal another round
+            Play again
           </button>
         ) : (
           <p className="over__waiting" data-testid="over-waiting">
-            Waiting for the host to deal again&hellip;
+            Waiting for the host to play again&hellip;
           </p>
         )}
         <button type="button" className="button button--ghost" onClick={onLeave} data-testid="over-leave">

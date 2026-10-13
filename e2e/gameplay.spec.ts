@@ -147,7 +147,7 @@ test.describe("calling Cambio", () => {
     for (const player of players) await player.close();
   });
 
-  test("deals another round for the whole table from the result screen", async ({ browser }) => {
+  test("plays another round for the whole table from the result screen", async ({ browser }) => {
     const { players } = await seatTable(browser, ["Ana", "Bo"]);
     const [ana, bo] = players;
     await startRound(players);
@@ -158,7 +158,7 @@ test.describe("calling Cambio", () => {
       await playSafeTurn(players);
     }
 
-    // Only the host can deal again; the others are told to wait.
+    // Only the host can play again; the others are told to wait.
     await expect(ana!.page.getByTestId("play-again")).toBeVisible();
     await expect(bo!.page.getByTestId("play-again")).toHaveCount(0);
     await expect(bo!.page.getByTestId("over-waiting")).toBeVisible();

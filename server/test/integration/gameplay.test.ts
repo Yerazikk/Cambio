@@ -285,7 +285,7 @@ describe("playing a round through to the end", () => {
     }
   });
 
-  it("deals another round to the same table when the host asks", async () => {
+  it("plays another round at the same table when the host asks", async () => {
     h = await harness();
     const { clients } = await h.table(["Ana", "Bo"]);
     await startGame(clients);
@@ -311,7 +311,7 @@ describe("playing a round through to the end", () => {
     }
   });
 
-  it("only lets the host deal again", async () => {
+  it("only lets the host play again", async () => {
     h = await harness();
     const { clients } = await h.table(["Ana", "Bo"]);
     await startGame(clients);
@@ -327,7 +327,7 @@ describe("playing a round through to the end", () => {
     expect(error.code).toBe("notHost");
   });
 
-  it("refuses to deal again mid-round", async () => {
+  it("refuses to play again mid-round", async () => {
     h = await harness();
     const { clients } = await h.table(["Ana", "Bo"]);
     await startGame(clients);

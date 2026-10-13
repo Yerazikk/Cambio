@@ -35,8 +35,8 @@ you take a penalty card. Empty your hand and the round ends on the spot.
 **Calling Cambio.** Instead of drawing, call Cambio. Everyone else takes one
 final turn, then all hands are revealed. Lowest total wins, and the caller wins
 ties — taking the risk earns the tiebreak. Call without the lowest hand and you
-take a 10-point penalty. Hands are revealed and scored, and the host can deal
-another round to the same table.
+take a 10-point penalty. Hands are revealed and scored, and the host can play
+another round with the same table.
 
 ## How a snap race is decided
 
@@ -147,7 +147,7 @@ npm run typecheck
   scoring, latency-compensated races driven by delayed pongs, and the
   hidden-information leak assertion.
 - **E2E** — 33 tests in real browsers, one context per player: lobby and kick, a
-  reload mid-game, a round played entirely by clicking, dealing another round,
+  reload mid-game, a round played entirely by clicking, playing again,
   and two browsers racing a snap with one of them throttled, asserting the whole
   table agrees on the winner.
 

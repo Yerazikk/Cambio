@@ -324,13 +324,13 @@ export class RoomManager {
   }
 
   /**
-   * Deal another round to the same table. Keeps everyone in their seat, so a
+   * Play another round at the same table. Keeps everyone in their seat, so a
    * group can keep playing without swapping room codes.
    */
   restart(code: RoomCode, byPlayerId: PlayerId): Result<{ out: Outbound[] }> {
     const room = this.rooms.get(code);
     if (!room) return err("roomNotFound", "that room no longer exists");
-    if (room.state.hostId !== byPlayerId) return err("notHost", "only the host can deal another round");
+    if (room.state.hostId !== byPlayerId) return err("notHost", "only the host can start another round");
     if (room.state.phase !== "finished") return err("illegalAction", "finish this round first");
     if (room.state.seats.length < MIN_PLAYERS) {
       return err("notEnoughPlayers", `you need at least ${MIN_PLAYERS} players`);
