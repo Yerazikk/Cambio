@@ -1,6 +1,9 @@
 import {
   DEFAULT_RULES,
+  isCardBack,
+  MAX_DECKS,
   MAX_PLAYERS,
+  MIN_DECKS,
   MIN_PLAYERS,
   RECONNECT_GRACE_IN_GAME_MS,
   RECONNECT_GRACE_LOBBY_MS,
@@ -309,6 +312,42 @@ export class RoomManager {
     return { ok: true, targetId };
   }
 
+  /**
+   * Choose how many packs the table plays with. Lobby only, so the deck cannot
+   * change under a round that is already being played.
+   */
+  setDecks(code: RoomCode, byPlayerId: PlayerId, decks: number): Result<{ decks: number }> {
+    const room = this.rooms.get(code);
+    if (!room) return err("roomNotFound", "that room no longer exists");
+    if (room.state.hostId !== byPlayerId) return err("notHost", "only the host can change the deck");
+    if (room.state.phase !== "lobby") return err("illegalAction", "the deck is set before the round starts");
+    if (!Number.isInteger(decks) || decks < MIN_DECKS || decks > MAX_DECKS) {
+      return err("malformed", `pick between ${MIN_DECKS} and ${MAX_DECKS} decks`);
+    }
+
+    room.state.rules = { ...room.state.rules, decks };
+    room.state.version += 1;
+    room.lastActivityAt = this.opts.now();
+    return { ok: true, decks };
+  }
+
+  /**
+   * Choose the table's card back. Allowed at any point, unlike the deck count:
+   * it changes nothing but how the cards look, so there is no round it could
+   * unsettle.
+   */
+  setBack(code: RoomCode, byPlayerId: PlayerId, back: string): Result<{ back: string }> {
+    const room = this.rooms.get(code);
+    if (!room) return err("roomNotFound", "that room no longer exists");
+    if (room.state.hostId !== byPlayerId) return err("notHost", "only the host can change the cards");
+    if (!isCardBack(back)) return err("malformed", `there is no card back called ${back}`);
+
+    room.state.back = back;
+    room.state.version += 1;
+    room.lastActivityAt = this.opts.now();
+    return { ok: true, back };
+  }
+
   start(code: RoomCode, byPlayerId: PlayerId): Result<{ out: Outbound[] }> {
     const room = this.rooms.get(code);
     if (!room) return err("roomNotFound", "that room no longer exists");
@@ -514,7 +553,7 @@ function autoPlay(state: GameState): Action | null {
       return { a: "discardDrawn" };
     case "powerPeekOwn":
     case "powerPeekOther":
-    case "powerBlindSwap":
+    case "powerFreeSwap":
     case "powerKing":
       return { a: "forfeitPower" };
     case "snapGiveCard":

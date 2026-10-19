@@ -1,11 +1,13 @@
 import { useEffect } from "react";
-import type { Action, Card, GameView, PlayerId } from "@cambio/shared";
-import { CardFace } from "../components/Card.js";
-import { Hand } from "../components/Hand.js";
+import { INITIAL_PEEKS, isInitialPeekSlot, type Action, type Card, type GameView, type PlayerId } from "@cambio/shared";
+import type { Flash } from "../components/Card.js";
 import { Piles } from "../components/Piles.js";
+import { Seat } from "../components/Seat.js";
 import { SnapBar } from "../components/SnapBar.js";
+import { TableLog } from "../components/TableLog.js";
 import { TurnClock } from "../components/TurnClock.js";
-import type { PickOne } from "../state/useGame.js";
+import { seatRing } from "../seating.js";
+import type { LogLine, PickOne } from "../state/useGame.js";
 
 export type TableProps = {
   view: GameView;
@@ -13,18 +15,22 @@ export type TableProps = {
   snapArmed: boolean;
   snapPending: boolean;
   pick: PickOne;
+  log: LogLine[];
   act: (action: Action) => void;
   snap: (targetId: PlayerId, slot: number) => void;
   armSnap: (armed: boolean) => void;
   setPick: (pick: PickOne) => void;
   revealFor: (ownerId: PlayerId, slot: number) => Card | null;
+  flashFor: (ownerId: PlayerId, slot: number) => Flash | null;
+  pileFlash: (pile: "deck" | "discard") => boolean;
   onLeave: () => void;
 };
 
 type SlotState = "idle" | "targetable" | "selected" | "snap";
 
 export function Table(props: TableProps): React.JSX.Element {
-  const { view, me, snapArmed, snapPending, pick, act, snap, armSnap, setPick, revealFor, onLeave } = props;
+  const { view, me, snapArmed, snapPending, pick, log, act, snap, armSnap, setPick } = props;
+  const { revealFor, flashFor, pileFlash, onLeave } = props;
 
   const myTurn = view.turnPlayerId === me;
   const mySeat = view.players.find((p) => p.id === me);
@@ -62,11 +68,13 @@ export function Table(props: TableProps): React.JSX.Element {
     if (snapArmed && view.snapOpen) return "snap";
     const mine = ownerId === me;
 
-    if (pick !== null && mine && pick.mySlot === slot) return "selected";
+    if (pick !== null && pick.ownerId === ownerId && pick.slot === slot) return "selected";
 
     if (view.phase === "study") {
-      const used = mySeat?.ready === true;
-      return mine && !used ? "targetable" : "idle";
+      if (!mine || mySeat === undefined || mySeat.ready) return "idle";
+      // Only the bottom row is studiable, and only once each.
+      const studiable = isInitialPeekSlot(slot, mySeat.slots.length, INITIAL_PEEKS);
+      return studiable && !mySeat.peeked.includes(slot) ? "targetable" : "idle";
     }
     if (view.phase === "snapGiveCard") return iOweACard && mine ? "targetable" : "idle";
     if (!myTurn) return "idle";
@@ -78,13 +86,26 @@ export function Table(props: TableProps): React.JSX.Element {
         return mine ? "targetable" : "idle";
       case "powerPeekOther":
         return mine ? "idle" : "targetable";
-      case "powerBlindSwap":
-        return pick === null ? (mine ? "targetable" : "idle") : mine ? "idle" : "targetable";
+      // Every swapping power takes any two cards on the table, so every card
+      // is live at every step of them.
+      case "powerFreeSwap":
       case "powerKing":
-        if (!view.kingPeeked) return "targetable";
-        return pick === null ? (mine ? "targetable" : "idle") : mine ? "idle" : "targetable";
+        return "targetable";
       default:
         return "idle";
+    }
+  };
+
+  /** The two clicks a swapping power takes: choose a card, then its partner. */
+  const chooseForSwap = (ownerId: PlayerId, slot: number): void => {
+    if (pick === null) {
+      setPick({ ownerId, slot });
+    } else if (pick.ownerId === ownerId && pick.slot === slot) {
+      // Clicking the chosen card again lets the player change their mind.
+      setPick(null);
+    } else {
+      act({ a: "freeSwap", aId: pick.ownerId, aSlot: pick.slot, bId: ownerId, bSlot: slot });
+      setPick(null);
     }
   };
 
@@ -115,32 +136,24 @@ export function Table(props: TableProps): React.JSX.Element {
       case "powerPeekOther":
         if (!mine) act({ a: "peekOther", playerId: ownerId, slot });
         return;
-      case "powerBlindSwap":
-        if (pick === null && mine) setPick({ mySlot: slot });
-        else if (pick !== null && !mine) {
-          act({ a: "blindSwap", mySlot: pick.mySlot, targetId: ownerId, targetSlot: slot });
-          setPick(null);
-        }
+      case "powerFreeSwap":
+        chooseForSwap(ownerId, slot);
         return;
       case "powerKing":
-        if (!view.kingPeeked) {
-          act({ a: "peekOther", playerId: ownerId, slot });
-        } else if (pick === null && mine) {
-          setPick({ mySlot: slot });
-        } else if (pick !== null && !mine) {
-          act({ a: "kingSwap", mySlot: pick.mySlot, targetId: ownerId, targetSlot: slot });
-          setPick(null);
-        }
+        // The look comes first; after that a king swaps like a jack or queen.
+        if (!view.kingPeeked) act({ a: "peekOther", playerId: ownerId, slot });
+        else chooseForSwap(ownerId, slot);
         return;
       default:
         return;
     }
   };
 
-  const others = view.players.filter((p) => p.id !== me);
+  // Everyone round one table, you at the bottom, in the order they would sit.
+  const ring = seatRing(view.players, me);
 
   return (
-    <main className="table">
+    <main className="table" data-players={view.players.length}>
       <header className="table__bar">
         <span className="table__code">{view.code}</span>
         <span className="table__status" data-testid="prompt">
@@ -154,65 +167,40 @@ export function Table(props: TableProps): React.JSX.Element {
         </span>
       </header>
 
-      <div className="table__opponents">
-        {others.map((player) => (
-          <Hand
-            key={player.id}
-            player={player}
-            isYou={false}
-            isTurn={view.turnPlayerId === player.id}
-            targetable={(slot) => slotState(player.id, slot)}
-            onSlot={(slot) => onSlot(player.id, slot)}
+      <div className="felt">
+        <div className="felt__surface" aria-hidden="true" />
+
+        <div className="felt__middle">
+          <Piles
+            deckCount={view.deckCount}
+            discardTop={view.discardTop}
+            discardCount={view.discardCount}
+            canDrawDeck={myTurn && view.phase === "awaitingAction"}
+            canDrawDiscard={myTurn && view.phase === "awaitingAction" && view.discardTop !== null}
+            snapArmed={snapArmed}
+            deckMoved={pileFlash("deck")}
+            discardMoved={pileFlash("discard")}
+            onDrawDeck={() => act({ a: "drawDeck" })}
+            onDrawDiscard={() => act({ a: "drawDiscard" })}
+          />
+        </div>
+
+        {ring.map((placement) => (
+          <Seat
+            key={placement.player.id}
+            placement={placement}
+            isTurn={view.turnPlayerId === placement.player.id}
+            targetable={(slot) => slotState(placement.player.id, slot)}
+            onSlot={(slot) => onSlot(placement.player.id, slot)}
             revealFor={revealFor}
+            flashFor={flashFor}
+            holding={view.heldBy === placement.player.id}
+            heldCard={view.heldBy === placement.player.id ? view.heldCard : null}
+            heldFromDiscard={view.heldFromDiscard}
           />
         ))}
-      </div>
 
-      <div className="table__middle">
-        <Piles
-          deckCount={view.deckCount}
-          discardTop={view.discardTop}
-          discardCount={view.discardCount}
-          canDrawDeck={myTurn && view.phase === "awaitingAction"}
-          canDrawDiscard={myTurn && view.phase === "awaitingAction" && view.discardTop !== null}
-          snapArmed={snapArmed}
-          onDrawDeck={() => act({ a: "drawDeck" })}
-          onDrawDiscard={() => act({ a: "drawDiscard" })}
-        />
-
-        {view.heldCard !== null && (
-          <div className="held" data-testid="held-card">
-            <CardFace card={view.heldCard} size="large" label="drawn" />
-            <p className="held__hint">
-              {view.heldFromDiscard
-                ? "Taken from the pile - it must go into your hand."
-                : "Click one of your cards to swap, or discard it."}
-            </p>
-            {!view.heldFromDiscard && (
-              <button
-                type="button"
-                className="button"
-                onClick={() => act({ a: "discardDrawn" })}
-                data-testid="discard-drawn"
-              >
-                Discard it
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="table__you">
-        {mySeat && (
-          <Hand
-            player={mySeat}
-            isYou
-            isTurn={myTurn}
-            targetable={(slot) => slotState(me, slot)}
-            onSlot={(slot) => onSlot(me, slot)}
-            revealFor={revealFor}
-          />
-        )}
+        <TableLog lines={log} />
       </div>
 
       <footer className="table__controls">
@@ -244,6 +232,22 @@ export function Table(props: TableProps): React.JSX.Element {
               data-testid="cambio-button"
             >
               Call Cambio
+            </button>
+          )}
+
+          {/*
+            The drawn card itself sits at your seat, above your hand; only the
+            choice of what to do with it belongs down here with the rest of the
+            turn's buttons.
+          */}
+          {myTurn && view.phase === "holdingCard" && !view.heldFromDiscard && (
+            <button
+              type="button"
+              className="button"
+              onClick={() => act({ a: "discardDrawn" })}
+              data-testid="discard-drawn"
+            >
+              Discard it
             </button>
           )}
 
@@ -284,7 +288,7 @@ function prompt(view: GameView, me: PlayerId, pick: PickOne, iOweACard: boolean)
   if (view.phase === "study") {
     return mySeat?.ready === true
       ? "Waiting for the others to finish studying..."
-      : "Look at two of your cards, then hit Ready";
+      : "Look at your two bottom cards, then hit Ready";
   }
   if (view.phase === "snapGiveCard") {
     const owed = view.players.find((p) => p.id === view.snapDebt?.targetId)?.name ?? "them";
@@ -298,18 +302,22 @@ function prompt(view: GameView, me: PlayerId, pick: PickOne, iOweACard: boolean)
     case "awaitingAction":
       return "Your turn - draw from the deck or the pile";
     case "holdingCard":
-      return "Swap it into your hand, or discard it";
+      return view.heldFromDiscard
+        ? "Taken from the pile - it must go into your hand"
+        : "Swap it into your hand, or discard it";
     case "powerPeekOwn":
       return "Seven or eight - look at one of your own cards";
     case "powerPeekOther":
       return "Nine or ten - look at an opponent's card";
-    case "powerBlindSwap":
+    case "powerFreeSwap":
       return pick === null
-        ? "Jack or queen - pick one of your cards to trade away"
-        : "Now pick the opponent's card to take";
+        ? "Jack or queen - pick any card on the table"
+        : "Now pick the card to swap it with - either hand will do";
     case "powerKing":
       if (!view.kingPeeked) return "King - look at any card on the table";
-      return pick === null ? "Now swap a pair, or keep both" : "Pick the opponent's card to take";
+      return pick === null
+        ? "Now pick any card to swap, or keep both as they are"
+        : "Now pick the card to swap it with - either hand will do";
     default:
       return "Your turn";
   }

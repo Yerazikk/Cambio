@@ -70,7 +70,7 @@ export function ranksMatch(a: Rank, b: Rank): boolean {
 }
 
 /** Which power a card triggers when discarded straight from the deck. */
-export type Power = "peekOwn" | "peekOther" | "blindSwap" | "king";
+export type Power = "peekOwn" | "peekOther" | "freeSwap" | "king";
 
 export function powerFor(rank: Rank): Power | null {
   switch (rank) {
@@ -80,9 +80,11 @@ export function powerFor(rank: Rank): Power | null {
     case 9:
     case 10:
       return "peekOther";
+    // Jacks and queens are the free hand: they move any two cards on the
+    // table, which includes two of your own and two of someone else's.
     case 11:
     case 12:
-      return "blindSwap";
+      return "freeSwap";
     case 13:
       return "king";
     default:

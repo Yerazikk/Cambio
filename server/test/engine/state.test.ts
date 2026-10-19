@@ -58,6 +58,32 @@ describe("view redaction", () => {
     expect(viewFor(state, "bo").heldCard).toBeNull();
   });
 
+  it("tells everyone who is holding a card, if not what it is", () => {
+    const state = fixture({ hands: { ana: ["S7"], bo: ["C3"] }, deck: ["D5"] });
+    state.held = { cardId: "D5", fromDiscard: false };
+
+    // A card leaving the pile is something the whole table watches happen.
+    expect(viewFor(state, "ana").heldBy).toBe("ana");
+    expect(viewFor(state, "bo").heldBy).toBe("ana");
+    expect(viewFor(state, "bo").heldCard).toBeNull();
+  });
+
+  it("shows a card taken off the discard pile to the whole table", () => {
+    const state = fixture({ hands: { ana: ["S7"], bo: ["C3"] }, discard: ["D5"] });
+    state.discard = [];
+    state.held = { cardId: "D5", fromDiscard: true };
+
+    // It was face up on the pile a moment ago, so hiding it now would be a
+    // fiction - and knowing it is exactly what makes taking one a decision.
+    expect(viewFor(state, "bo").heldCard?.id).toBe("D5");
+  });
+
+  it("leaves heldBy null when nobody is holding anything", () => {
+    const state = fixture({ hands: { ana: ["S7"], bo: ["C3"] } });
+
+    expect(viewFor(state, "ana").heldBy).toBeNull();
+  });
+
   it("shows a pending power only to the player who must resolve it", () => {
     const state = fixture({ hands: { ana: ["S7"], bo: ["C3"] } });
     state.pendingPower = "peekOther";
@@ -86,7 +112,7 @@ describe("knowledge follows the card, not the slot", () => {
     learn(state, "D9", "ana");
     expect(slotFaces(viewFor(state, "ana"), "bo")).toEqual([null, "D9"]);
 
-    // A blind swap moves that card to Cy's slot 0.
+    // A jack or queen moves that card to Cy's slot 0.
     state.seats[1]!.hand[1] = "H4";
     state.seats[2]!.hand[0] = "D9";
 

@@ -1,11 +1,15 @@
 import {
+  isInitialPeekSlot,
   powerFor,
   type CardId,
   type EngineAction,
   type ErrorCode,
   type Phase,
   type PlayerId,
+  type Power,
   type ServerEvent,
+  type SlotRef,
+  type TableEventKind,
 } from "@cambio/shared";
 import { shuffle } from "../deck.js";
 import type { Rng } from "../rng.js";
@@ -65,13 +69,21 @@ function applyAction(
     case "initialPeek": {
       if (state.phase !== "study") return fail("illegalAction", "the study phase is over");
       if (actor.ready) return fail("illegalAction", "you already finished studying");
-      if (actor.initialPeeksUsed >= state.rules.initialPeeks) {
+      if (actor.initialPeeked.length >= state.rules.initialPeeks) {
         return fail("illegalAction", `you may only study ${state.rules.initialPeeks} cards`);
       }
       const cardId = actor.hand[action.slot];
       if (cardId === undefined) return fail("badSlot", `you have no slot ${action.slot}`);
+      // Only the bottom row of the hand is yours to study, so every player
+      // starts the round knowing the same two positions.
+      if (!isInitialPeekSlot(action.slot, actor.hand.length, state.rules.initialPeeks)) {
+        return fail("badSlot", "only your bottom cards may be studied");
+      }
+      if (actor.initialPeeked.includes(action.slot)) {
+        return fail("illegalAction", "you have already studied that card");
+      }
 
-      actor.initialPeeksUsed += 1;
+      actor.initialPeeked.push(action.slot);
       reveal(state, out, actorId, actorId, action.slot, cardId);
       return { ok: true, state, out };
     }
@@ -103,6 +115,7 @@ function applyAction(
       state.phase = "holdingCard";
       // You see what you draw, so you know it from here on.
       learn(state, cardId, actorId);
+      announce(out, "draw", actorId);
       return { ok: true, state, out };
     }
 
@@ -115,6 +128,7 @@ function applyAction(
       state.held = { cardId, fromDiscard: true };
       state.phase = "holdingCard";
       learn(state, cardId, actorId);
+      announce(out, "take", actorId);
       return { ok: true, state, out };
     }
 
@@ -129,6 +143,7 @@ function applyAction(
       // than seat count minus one because ending the calling turn immediately
       // below spends one of them, and the caller does not get a final turn.
       state.finalTurnsRemaining = state.seats.length;
+      announce(out, "cambio", actorId);
       endTurn(state, out, ctx);
       return { ok: true, state, out };
     }
@@ -149,6 +164,7 @@ function applyAction(
       // of it stops being meaningful.
       forgetCard(state, displaced);
       state.held = null;
+      announce(out, "replace", actorId, [{ ownerId: actorId, slot: action.slot }]);
       endTurn(state, out, ctx);
       return { ok: true, state, out };
     }
@@ -165,6 +181,7 @@ function applyAction(
       state.discard.push(held.cardId);
       forgetCard(state, held.cardId);
       state.held = null;
+      announce(out, "discard", actorId);
 
       const card = state.cards.get(held.cardId);
       const power = card ? powerFor(card.rank) : null;
@@ -176,14 +193,7 @@ function applyAction(
       // Only a card discarded straight from the deck triggers its power.
       state.pendingPower = power;
       state.kingPeeked = false;
-      state.phase =
-        power === "peekOwn"
-          ? "powerPeekOwn"
-          : power === "peekOther"
-            ? "powerPeekOther"
-            : power === "blindSwap"
-              ? "powerBlindSwap"
-              : "powerKing";
+      state.phase = phaseForPower(power);
       return { ok: true, state, out };
     }
 
@@ -225,17 +235,20 @@ function applyAction(
       return { ok: true, state, out };
     }
 
-    case "blindSwap": {
-      const guard = requireTurn(state, actorId, "powerBlindSwap");
+    case "freeSwap": {
+      // A king swaps on the same terms as a jack or queen, so both phases
+      // accept this - the king just has to spend its look first.
+      const isKing = state.phase === "powerKing";
+      const guard = requireTurn(state, actorId, isKing ? "powerKing" : "powerFreeSwap");
       if (guard) return guard;
-      return applySwap(state, out, ctx, actorId, action.mySlot, action.targetId, action.targetSlot);
-    }
+      if (isKing && !state.kingPeeked) return fail("illegalAction", "look at a card before swapping");
 
-    case "kingSwap": {
-      const guard = requireTurn(state, actorId, "powerKing");
-      if (guard) return guard;
-      if (!state.kingPeeked) return fail("illegalAction", "look at a card before swapping");
-      return applySwap(state, out, ctx, actorId, action.mySlot, action.targetId, action.targetSlot);
+      // Neither end has to be the actor's: two of yours, two of theirs, or one
+      // of each. The only pair that cannot be named is one card twice.
+      if (action.aId === action.bId && action.aSlot === action.bSlot) {
+        return fail("badTarget", "pick two different cards");
+      }
+      return applySwap(state, out, ctx, actorId, action.aId, action.aSlot, action.bId, action.bSlot);
     }
 
     case "forfeitPower": {
@@ -277,6 +290,9 @@ function applyAction(
 
       actor.hand.splice(action.slot, 1);
       target.hand.push(cardId);
+      // The card's new home is what everyone needs to see; the slot it left
+      // no longer exists, since the rest of the hand has closed up behind it.
+      announce(out, "give", actorId, [{ ownerId: target.id, slot: target.hand.length - 1 }]);
       state.snapGiveFor = null;
       // The snap interrupted a turn in progress; put the table back where it was.
       state.phase = phaseAfterSnapGive(state);
@@ -302,6 +318,15 @@ function requireTurn(state: GameState, actorId: PlayerId, phase: Phase): ReduceR
   return null;
 }
 
+/**
+ * Tell the whole table what just happened, in the terms it would have seen
+ * across a real one: the gesture, who made it, and which cards it touched.
+ * Never a face - those still go only to whoever is entitled to them.
+ */
+function announce(out: Outbound[], kind: TableEventKind, byId: PlayerId, slots: SlotRef[] = []): void {
+  out.push({ to: "all", event: { t: "table.event", kind, byId, slots } });
+}
+
 function reveal(
   state: GameState,
   out: Outbound[],
@@ -318,33 +343,44 @@ function reveal(
       event: { t: "card.revealed", ownerId, slot, card, ttlMs: state.rules.peekMs },
     });
   }
+  // Which card was looked at is public even though its face is not - the
+  // table watches you pick one up. What you saw stays yours to remember, and
+  // `PlayerView.peeked` still keeps your study choices to yourself.
+  announce(out, "peek", viewerId, [{ ownerId, slot }]);
 }
 
+/**
+ * Exchange two cards anywhere on the table. Every swapping power allows any
+ * pair, so this only has to find both ends and move them.
+ */
 function applySwap(
   state: GameState,
   out: Outbound[],
   ctx: ReduceCtx,
   actorId: PlayerId,
-  mySlot: number,
-  targetId: PlayerId,
-  targetSlot: number,
+  aId: PlayerId,
+  aSlot: number,
+  bId: PlayerId,
+  bSlot: number,
 ): ReduceResult {
-  if (targetId === actorId) return fail("badTarget", "pick another player's card to swap with");
-  const me = seatOf(state, actorId);
-  const them = seatOf(state, targetId);
-  if (!me) return fail("sessionInvalid", "you are not seated at this table");
-  if (!them) return fail("badTarget", "no such player");
+  const a = seatOf(state, aId);
+  const b = seatOf(state, bId);
+  if (!a || !b) return fail("badTarget", "no such player");
 
-  const mine = me.hand[mySlot];
-  const theirs = them.hand[targetSlot];
-  if (mine === undefined) return fail("badSlot", `you have no slot ${mySlot}`);
-  if (theirs === undefined) return fail("badSlot", `${them.name} has no slot ${targetSlot}`);
+  const aCard = a.hand[aSlot];
+  const bCard = b.hand[bSlot];
+  if (aCard === undefined) return fail("badSlot", `${a.name} has no slot ${aSlot}`);
+  if (bCard === undefined) return fail("badSlot", `${b.name} has no slot ${bSlot}`);
 
   // Knowledge is keyed on the card, so whoever knew these cards still knows
   // them in their new homes without any bookkeeping here.
-  me.hand[mySlot] = theirs;
-  them.hand[targetSlot] = mine;
+  a.hand[aSlot] = bCard;
+  b.hand[bSlot] = aCard;
 
+  announce(out, "swap", actorId, [
+    { ownerId: aId, slot: aSlot },
+    { ownerId: bId, slot: bSlot },
+  ]);
   endTurn(state, out, ctx);
   return { ok: true, state, out };
 }
@@ -380,7 +416,10 @@ function resolveSnap(
     // get to see what you were given.
     if (refillDeckIfEmpty(state, ctx)) {
       const penalty = state.deck.pop();
-      if (penalty !== undefined) winner.hand.push(penalty);
+      if (penalty !== undefined) {
+        winner.hand.push(penalty);
+        announce(out, "penalty", winnerId, [{ ownerId: winnerId, slot: winner.hand.length - 1 }]);
+      }
     }
     out.push({
       to: "all",
@@ -413,21 +452,24 @@ function resolveSnap(
   return { ok: true, state, out };
 }
 
-/** Where the table returns to once a snapper has paid their card. */
-function phaseAfterSnapGive(state: GameState): Phase {
-  if (state.held !== null) return "holdingCard";
-  switch (state.pendingPower) {
+/** The phase a power waits in while the player resolves it. */
+function phaseForPower(power: Power): Phase {
+  switch (power) {
     case "peekOwn":
       return "powerPeekOwn";
     case "peekOther":
       return "powerPeekOther";
-    case "blindSwap":
-      return "powerBlindSwap";
+    case "freeSwap":
+      return "powerFreeSwap";
     case "king":
       return "powerKing";
-    default:
-      return "awaitingAction";
   }
+}
+
+/** Where the table returns to once a snapper has paid their card. */
+function phaseAfterSnapGive(state: GameState): Phase {
+  if (state.held !== null) return "holdingCard";
+  return state.pendingPower === null ? "awaitingAction" : phaseForPower(state.pendingPower);
 }
 
 function turnDeadline(state: GameState, ctx: ReduceCtx): number | null {

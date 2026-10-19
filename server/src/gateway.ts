@@ -166,6 +166,36 @@ export function createGateway<S>(opts: GatewayOptions<S>): Gateway<S> {
         return;
       }
 
+      case "lobby.decks": {
+        const binding = bySocket.get(socket);
+        if (!binding) {
+          fail(socket, "sessionInvalid", "join a table first");
+          return;
+        }
+        const result = manager.setDecks(binding.code, binding.playerId, msg.decks);
+        if (!result.ok) {
+          fail(socket, result.code, result.message);
+          return;
+        }
+        broadcastState(binding.code);
+        return;
+      }
+
+      case "lobby.back": {
+        const binding = bySocket.get(socket);
+        if (!binding) {
+          fail(socket, "sessionInvalid", "join a table first");
+          return;
+        }
+        const result = manager.setBack(binding.code, binding.playerId, msg.back);
+        if (!result.ok) {
+          fail(socket, result.code, result.message);
+          return;
+        }
+        broadcastState(binding.code);
+        return;
+      }
+
       case "lobby.start": {
         const binding = bySocket.get(socket);
         if (!binding) {

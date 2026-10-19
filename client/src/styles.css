@@ -131,8 +131,13 @@ kbd {
 
 .card {
   position: relative;
-  width: 52px;
-  height: 74px;
+  /*
+   * Cards take their size from whatever they sit in, so the whole table can be
+   * scaled down on a small screen by moving two numbers rather than resizing
+   * every card, pile and seat in a media query.
+   */
+  width: var(--card-w, 52px);
+  height: var(--card-h, 74px);
   border-radius: 7px;
   border: 1px solid rgba(0, 0, 0, 0.35);
   box-shadow: var(--shadow);
@@ -147,12 +152,12 @@ kbd {
   transition: transform 120ms ease, box-shadow 120ms ease, outline-color 120ms ease;
 }
 .card--small {
-  width: 40px;
-  height: 58px;
+  width: calc(var(--card-w, 52px) * 0.77);
+  height: calc(var(--card-h, 74px) * 0.77);
 }
 .card--large {
-  width: 66px;
-  height: 94px;
+  width: calc(var(--card-w, 52px) * 1.27);
+  height: calc(var(--card-h, 74px) * 1.27);
 }
 
 .card--up {
@@ -162,15 +167,23 @@ kbd {
 .card--red {
   color: #c62828;
 }
+/*
+ * A face-down card wears the table's chosen back. The gradient stays underneath
+ * as the ground the artwork is painted on, so a back that has not loaded yet -
+ * or a table with none set - still reads as a card rather than a blank.
+ */
 .card--down {
   background: linear-gradient(135deg, #1d4ed8 0%, #16307c 60%, #0f1f52 100%);
   color: transparent;
+  overflow: hidden;
 }
-.card__back {
-  width: 70%;
-  height: 76%;
-  border-radius: 4px;
-  border: 1px dashed rgba(255, 255, 255, 0.35);
+.card__art {
+  position: absolute;
+  inset: 0;
+  background-image: var(--card-back, none);
+  background-size: cover;
+  background-position: center;
+  border-radius: inherit;
 }
 .card__rank {
   font-size: 1.15rem;
@@ -228,7 +241,10 @@ kbd {
 }
 @media (prefers-reduced-motion: reduce) {
   .card,
-  .card--snap {
+  .card--snap,
+  .pile--moved .card,
+  .seat__held,
+  [class*="card--did-"] {
     animation: none;
     transition: none;
   }
@@ -351,6 +367,95 @@ kbd {
   gap: 0.45rem;
   font-weight: 600;
 }
+.decks {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 1rem;
+}
+.decks__label {
+  font-weight: 600;
+}
+.decks__choices {
+  display: flex;
+  gap: 0.3rem;
+}
+.decks__choice {
+  min-width: 2.2rem;
+  padding: 0.3rem 0.1rem;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+/* Everyone sees the table's setting; only the host can move it. */
+.decks__choice:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.decks__choice--on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1400;
+}
+.decks__hint {
+  margin: 0 0 0 auto;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.backs {
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 1rem;
+}
+.backs__label {
+  font-weight: 600;
+}
+.backs__choices {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+.backs__choice {
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background-color: #16307c;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  /*
+   * The art carries its own pale border, so the ring that marks the choice is
+   * held off the card and sits on the dark panel instead - otherwise it is
+   * invisible against the gold and yellow backs.
+   */
+  outline: 3px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color 120ms ease, transform 120ms ease;
+}
+.backs__choice:disabled {
+  cursor: default;
+}
+.backs__choice:not(:disabled):hover {
+  transform: translateY(-3px);
+}
+.backs__choice--on {
+  outline-color: var(--accent);
+}
+
 .lobby__actions {
   display: flex;
   gap: 0.6rem;
@@ -368,16 +473,40 @@ kbd {
 
 /* ------------------------------------------------------------------ table */
 
+/*
+ * The table is seen from above: one felt in the middle, the piles at its
+ * centre, and a seat for every player spaced evenly round the rim. You are
+ * always at the bottom, and the rest keep their order in the player list, so
+ * four players make a square, five a pentagon, six a hexagon - the geometry is
+ * computed in `seating.ts` and arrives as a left/top percentage per seat.
+ *
+ * Cards stay the right way up at every seat. A genuinely rotated hand is how a
+ * real table looks, but a name and a rank read upside down from the far side
+ * of it are no use to anyone, and the ring itself already says who sits where.
+ */
+/*
+ * One number sets the scale of everything on the felt. It follows whichever
+ * of the two viewport dimensions is the tighter, because the ring needs both:
+ * a short window runs the far seat into the piles just as surely as a narrow
+ * one runs the side seats into them.
+ */
 .table {
+  --card-w: clamp(28px, min(3.9vw, 5.6vh), 50px);
+  --card-h: calc(var(--card-w) * 1.42);
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 0.75rem;
   padding-block: 0.75rem 1rem;
   padding-inline: 16px;
-  max-width: 1100px;
+  max-width: 1180px;
   margin: 0 auto;
   width: 100%;
+}
+/* A fuller table gets smaller cards, so the ring stays the same ring. */
+.table[data-players="5"],
+.table[data-players="6"] {
+  --card-w: clamp(26px, min(3.3vw, 4.8vh), 44px);
 }
 .table__bar {
   display: flex;
@@ -410,19 +539,35 @@ kbd {
   color: var(--bad);
 }
 
-.table__opponents {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+/* --------------------------------------------------------------- the felt */
+
+.felt {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  /*
+   * Seats are placed as a percentage of this box, so it takes every row of
+   * height going: the vertical axis is the tight one, with the far seat, the
+   * piles and your own seat all having to clear each other on it.
+   */
+  min-height: 24rem;
+  margin: 0 auto;
 }
-.table__middle {
-  display: flex;
-  gap: 1.5rem;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  padding-block: 0.5rem;
+.felt__surface {
+  position: absolute;
+  inset: 7% 5%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 38%, #15764a 0%, #0e5533 55%, #0a3f26 100%);
+  border: 3px solid rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45), 0 10px 30px rgba(0, 0, 0, 0.35);
 }
+.felt__middle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .piles {
   display: flex;
   gap: 1.1rem;
@@ -434,73 +579,96 @@ kbd {
   gap: 0.35rem;
 }
 .pile__label {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--muted);
+  white-space: nowrap;
 }
-.held {
+/* A pile that has just been drawn from or added to, so the movement is seen. */
+.pile--moved .card {
+  animation: pile-moved 700ms ease-out;
+}
+@keyframes pile-moved {
+  0% {
+    transform: translateY(-10px) scale(1.07);
+    box-shadow: 0 0 0 3px var(--accent), var(--shadow);
+  }
+  100% {
+    transform: none;
+    box-shadow: 0 0 0 0 transparent, var(--shadow);
+  }
+}
+
+/* -------------------------------------------------------------- the seats */
+
+.seat {
+  position: absolute;
+  /*
+   * Seats are centred on their point on the ring, except at the very top and
+   * bottom, where they are tucked back towards the middle so a tall seat
+   * cannot push past the edge of the felt and into the controls.
+   */
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--accent);
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem 0.45rem;
   border-radius: var(--radius);
-  padding: 0.8rem 1rem;
-  max-width: 15rem;
+  border: 1px solid transparent;
+  background: rgba(0, 0, 0, 0.32);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
-.held__hint {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--muted);
-  text-align: center;
+/*
+ * The seats on the vertical axis are tucked back off their point on the ring,
+ * away from the piles in the middle and away from the edge of the table. They
+ * are the only two that have anything to clear.
+ */
+.seat--bottom {
+  transform: translate(-50%, -65%);
 }
-
-.seat {
-  flex: 1 1 13rem;
-  background: rgba(0, 0, 0, 0.24);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.7rem 0.8rem;
+.seat--top {
+  transform: translate(-50%, -40%);
 }
 .seat--you {
-  flex: 1 1 100%;
-  background: rgba(0, 0, 0, 0.34);
+  background: rgba(0, 0, 0, 0.46);
+  border-color: var(--line);
 }
 .seat--turn {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 22px rgba(255, 197, 61, 0.28);
 }
 .seat--away {
-  opacity: 0.6;
+  opacity: 0.55;
 }
 .seat__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.55rem;
+  gap: 0.4rem;
+  max-width: 100%;
 }
 .seat__name {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
   font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 .seat__meta {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
 .seat__badge,
 .seat__away,
 .seat__called {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 700;
-  padding: 0.12rem 0.4rem;
+  padding: 0.1rem 0.35rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
   color: var(--muted);
@@ -517,15 +685,207 @@ kbd {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.seat__cards {
+/*
+ * The hand and whatever its owner is holding, and which way the one hangs off
+ * the other. Your own drawn card goes below your hand, so your cards sit above
+ * the card you have temporarily grabbed. Everyone else's goes beside theirs,
+ * towards the middle of the felt: that is where a card you have just picked up
+ * would land on a real table, and it is the one direction in which a seat can
+ * grow without running into its neighbour or the piles.
+ */
+.seat__play {
   display: flex;
-  gap: 0.45rem;
-  flex-wrap: wrap;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+.seat--right .seat__play {
+  flex-direction: row-reverse;
+}
+.seat--you .seat__play {
+  flex-direction: column;
+  align-items: center;
+}
+
+/*
+ * Hands are two to a row rather than one long line, which is how they sit on a
+ * table and what makes "the bottom two" a position a player can point at. A
+ * hand that grows past four simply spills onto a third row.
+ */
+.seat__cards {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: 0.3rem;
+  justify-content: center;
+  /* So a card being looked at tips up rather than merely narrowing. */
+  perspective: 700px;
 }
 .seat__empty {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  padding: 0.6rem 0;
 }
+
+/*
+ * The card a player has picked up, set down beside their hand with a dashed
+ * line between the two - the hand they hold and the card they have not decided
+ * about yet are different things, and the line is what says so.
+ */
+.seat__held {
+  padding-left: 0.4rem;
+  border-left: 1px dashed rgba(255, 197, 61, 0.45);
+  animation: held-in 260ms ease-out;
+}
+.seat--right .seat__held {
+  padding-left: 0;
+  padding-right: 0.4rem;
+  border-left: none;
+  border-right: 1px dashed rgba(255, 197, 61, 0.45);
+}
+.seat--you .seat__held {
+  padding-left: 0;
+  padding-top: 0.35rem;
+  border-left: none;
+  border-top: 1px dashed rgba(255, 197, 61, 0.45);
+}
+.seat__held .card {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow);
+}
+@keyframes held-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.85);
+  }
+}
+.seat--holding {
+  border-color: rgba(255, 197, 61, 0.5);
+}
+
+/* ------------------------------------------------------ what just happened */
+
+/*
+ * Every move animates on every screen at the same moment. Cambio is played
+ * face down, so this is what keeps it readable: you cannot see what the card
+ * is, but you can see it being turned over, traded or snapped, exactly as you
+ * would across a real table.
+ */
+/*
+ * A ring for as long as the move is live, so a player who glances over a beat
+ * late still sees which card it was, and the motion on top of it for anyone
+ * watching when it lands. The colour is the move: gold for a look, blue for a
+ * trade, green for a card arriving, red for a snap or a penalty.
+ */
+.card--did-peek,
+.card--did-swap,
+.card--did-replace,
+.card--did-give,
+.card--did-penalty,
+.card--did-snap {
+  z-index: 2;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.card--did-swap {
+  outline-color: #7cc5ff;
+}
+.card--did-replace,
+.card--did-give {
+  outline-color: var(--good);
+}
+.card--did-penalty,
+.card--did-snap {
+  outline-color: var(--bad);
+}
+
+.card--did-peek {
+  animation: did-peek 900ms ease-in-out;
+}
+@keyframes did-peek {
+  0%,
+  100% {
+    transform: none;
+  }
+  30%,
+  60% {
+    transform: translateY(-8px) rotateY(58deg);
+    box-shadow: 0 14px 20px rgba(0, 0, 0, 0.45);
+  }
+}
+.card--did-swap {
+  animation: did-swap 900ms ease-in-out;
+}
+@keyframes did-swap {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateY(-14px) rotate(-7deg);
+    box-shadow: 0 14px 20px rgba(0, 0, 0, 0.45);
+  }
+  65% {
+    transform: translateY(-6px) rotate(5deg);
+    box-shadow: 0 10px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+.card--did-replace,
+.card--did-give {
+  animation: did-land 800ms ease-out;
+}
+@keyframes did-land {
+  0% {
+    transform: translateY(-20px) scale(1.14);
+    box-shadow: 0 16px 24px rgba(0, 0, 0, 0.5);
+  }
+  100% {
+    transform: none;
+  }
+}
+.card--did-penalty,
+.card--did-snap {
+  animation: did-snap 800ms ease-out;
+}
+@keyframes did-snap {
+  0%,
+  100% {
+    transform: none;
+  }
+  15%,
+  45% {
+    transform: translateX(-4px) scale(1.08);
+  }
+  30%,
+  60% {
+    transform: translateX(4px) scale(1.08);
+  }
+}
+
+/* --------------------------------------------------------------- the log */
+
+.tablelog {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 14rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--muted);
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+.tablelog__line {
+  opacity: 0.4;
+}
+.tablelog__line--latest {
+  opacity: 1;
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------- turn controls */
 
 .table__controls {
   margin-top: auto;
@@ -671,17 +1031,52 @@ kbd {
   border-color: var(--bad);
 }
 
-@media (max-width: 560px) {
-  .card {
-    width: 44px;
-    height: 63px;
+/*
+ * In a short window the piles move up off your own seat, which is the tallest
+ * at the table once you are holding a card, and it tucks further back from the
+ * edge. The ring holds its shape all the way down: a phone-sized table is
+ * small but still a table, so who-sits-where is the same thing to learn on
+ * every screen.
+ */
+@media (max-height: 720px) {
+  .felt__middle {
+    top: 42%;
   }
-  .card--large {
-    width: 56px;
-    height: 80px;
+  .seat--bottom {
+    transform: translate(-50%, -72%);
+  }
+}
+@media (max-width: 900px) {
+  .felt {
+    min-height: 21rem;
+  }
+}
+@media (max-width: 640px) {
+  .table {
+    padding-inline: 10px;
+  }
+  .felt {
+    min-height: 18rem;
   }
   .seat {
-    flex-basis: 100%;
+    padding: 0.25rem 0.3rem 0.3rem;
+    gap: 0.2rem;
+  }
+  .seat__name {
+    font-size: 0.72rem;
+  }
+  .seat__cards {
+    gap: 0.2rem;
+  }
+  .piles {
+    gap: 0.6rem;
+  }
+  .pile__label {
+    font-size: 0.6rem;
+  }
+  /* At this width the log would land on top of the nearest seat. */
+  .tablelog {
+    display: none;
   }
   .snapbar {
     flex-basis: 100%;

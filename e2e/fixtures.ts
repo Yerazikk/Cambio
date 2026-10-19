@@ -91,9 +91,9 @@ export async function startRound(players: Player[]): Promise<void> {
 
   for (const player of players) {
     await expect(player.page.getByTestId("ready-button")).toBeVisible();
-    // Study two cards, which is what the rules allow.
-    await player.slot(0).click();
-    await player.slot(1).click();
+    // Study the bottom row, which is what the rules allow.
+    await player.slot(2).click();
+    await player.slot(3).click();
     await player.page.getByTestId("ready-button").click();
   }
 

@@ -100,12 +100,67 @@ test.describe("the lobby", () => {
     for (const player of players) await player.close();
   });
 
+  test("lets the host pick the number of decks, and shows it to everyone", async ({ browser }) => {
+    const { players } = await seatTable(browser, ["Ana", "Bo"]);
+    const [ana, bo] = players;
+
+    // One deck to begin with, chosen for everyone.
+    for (const player of players) {
+      await expect(player.page.getByTestId("decks-1")).toHaveAttribute("aria-pressed", "true");
+    }
+    await expect(ana!.page.getByTestId("decks-hint")).toContainText("54 cards");
+
+    await ana!.page.getByTestId("decks-3").click();
+
+    for (const player of players) {
+      await expect(player.page.getByTestId("decks-3")).toHaveAttribute("aria-pressed", "true");
+      await expect(player.page.getByTestId("decks-1")).toHaveAttribute("aria-pressed", "false");
+    }
+    await expect(ana!.page.getByTestId("decks-hint")).toContainText("162 cards");
+
+    // The choice is the host's alone.
+    await expect(bo!.page.getByTestId("decks-2")).toBeDisabled();
+    await expect(ana!.page.getByTestId("decks-2")).toBeEnabled();
+
+    for (const player of players) await player.close();
+  });
+
+  test("lets the host pick the card back, and deals it to every screen", async ({ browser }) => {
+    const { players } = await seatTable(browser, ["Ana", "Bo"]);
+    const [ana, bo] = players;
+
+    await expect(ana!.page.getByTestId("back-navy-geometric")).toHaveAttribute("aria-pressed", "true");
+    // The choice is the host's alone.
+    await expect(bo!.page.getByTestId("back-red-grid")).toBeDisabled();
+    await expect(ana!.page.getByTestId("back-red-grid")).toBeEnabled();
+
+    await ana!.page.getByTestId("back-red-grid").click();
+
+    for (const player of players) {
+      await expect(player.page.getByTestId("back-red-grid")).toHaveAttribute("aria-pressed", "true");
+      await expect(player.page.getByTestId("back-navy-geometric")).toHaveAttribute("aria-pressed", "false");
+    }
+
+    // ...and it is the back the cards actually wear once they are dealt.
+    await ana!.page.getByTestId("start-button").click();
+    for (const player of players) {
+      await expect(player.page.getByTestId("ready-button")).toBeVisible();
+      const back = await player.slot(0).evaluate((card) => {
+        const art = card.querySelector(".card__art");
+        return art === null ? "" : getComputedStyle(art).backgroundImage;
+      });
+      expect(back).toContain("/backs/red-grid.svg");
+    }
+
+    for (const player of players) await player.close();
+  });
+
   test("starts the round for everyone at once", async ({ browser }) => {
     const { players } = await seatTable(browser, ["Ana", "Bo"]);
     await players[0]!.page.getByTestId("start-button").click();
 
     for (const player of players) {
-      await expect(player.page.getByTestId("prompt")).toContainText(/look at two of your cards/i);
+      await expect(player.page.getByTestId("prompt")).toContainText(/look at your two bottom cards/i);
       await expect(player.page.getByTestId("deck")).toBeVisible();
       // Four cards each, all face down.
       for (let slot = 0; slot < 4; slot++) {
@@ -115,18 +170,23 @@ test.describe("the lobby", () => {
     for (const player of players) await player.close();
   });
 
-  test("lets each player study two cards and no more", async ({ browser }) => {
+  test("lets each player study the bottom two cards and no more", async ({ browser }) => {
     const { players } = await seatTable(browser, ["Ana", "Bo"]);
     const [ana] = players;
     await ana!.page.getByTestId("start-button").click();
     await expect(ana!.page.getByTestId("ready-button")).toBeVisible();
 
-    await ana!.slot(0).click();
-    await ana!.slot(1).click();
-    await ana!.slot(2).click();
+    // The top row is not offered at all - only the bottom two are clickable.
+    await expect(ana!.slot(0)).not.toHaveClass(/card--targetable/);
+    await expect(ana!.slot(1)).not.toHaveClass(/card--targetable/);
+    await expect(ana!.slot(2)).toHaveClass(/card--targetable/);
 
-    // The third attempt is refused rather than silently ignored.
-    await expect(ana!.page.getByTestId("toast")).toContainText(/only study 2/i);
+    await ana!.slot(2).click();
+    await ana!.slot(3).click();
+
+    // Both are spent, so neither is offered any more.
+    await expect(ana!.slot(2)).not.toHaveClass(/card--targetable/);
+    await expect(ana!.slot(3)).not.toHaveClass(/card--targetable/);
 
     for (const player of players) await player.close();
   });

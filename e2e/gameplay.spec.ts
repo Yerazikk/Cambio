@@ -93,11 +93,11 @@ test.describe("playing by clicking", () => {
     await ana!.page.getByTestId("start-button").click();
     await expect(ana!.page.getByTestId("ready-button")).toBeVisible();
 
-    await ana!.slot(0).click();
+    await ana!.slot(2).click();
     // The peek is shown to this player...
-    await expect(ana!.slot(0)).toHaveClass(/card--up/);
+    await expect(ana!.slot(2)).toHaveClass(/card--up/);
     // ...and then taken away again, because remembering it is the game.
-    await expect(ana!.slot(0)).not.toHaveClass(/card--up/, { timeout: 15_000 });
+    await expect(ana!.slot(2)).not.toHaveClass(/card--up/, { timeout: 15_000 });
 
     for (const player of players) await player.close();
   });
@@ -169,7 +169,7 @@ test.describe("calling Cambio", () => {
     for (const player of players) {
       await expect(player.page.getByTestId("game-over")).toHaveCount(0);
       await expect(player.page.getByTestId("ready-button")).toBeVisible();
-      await expect(player.page.getByTestId("prompt")).toContainText(/look at two of your cards/i);
+      await expect(player.page.getByTestId("prompt")).toContainText(/look at your two bottom cards/i);
     }
 
     for (const player of players) await player.close();

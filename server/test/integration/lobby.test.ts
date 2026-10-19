@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { MAX_PLAYERS } from "@cambio/shared";
+import { CARDS_PER_DECK, CARD_BACKS, DEFAULT_BACK, HAND_SIZE, MAX_PLAYERS } from "@cambio/shared";
 import { harness, startGame, type Harness } from "./harness.js";
 
 let h: Harness;
@@ -172,16 +172,168 @@ describe("starting the game", () => {
     clients[0]!.send({ t: "lobby.start" });
     await clients[0]!.waitForState((v) => v.phase === "study");
 
-    clients[0]!.act({ a: "initialPeek", slot: 0 });
+    clients[0]!.act({ a: "initialPeek", slot: 2 });
     const first = await clients[0]!.next("card.revealed");
     expect(first.ownerId).toBe(clients[0]!.playerId);
 
-    clients[0]!.act({ a: "initialPeek", slot: 1 });
+    clients[0]!.act({ a: "initialPeek", slot: 3 });
     await clients[0]!.next("card.revealed");
 
     clients[0]!.act({ a: "initialPeek", slot: 2 });
     const error = await clients[0]!.next("error");
     expect(error.code).toBe("illegalAction");
+  });
+
+  it("plays with one pack unless the host says otherwise", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    const view = await clients[1]!.waitForState((v) => v.players.length === 2);
+    expect(view.decks).toBe(1);
+  });
+
+  it("lets the host choose the number of packs, and shows it to everyone", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    clients[0]!.send({ t: "lobby.decks", decks: 3 });
+
+    for (const client of clients) {
+      const view = await client.waitForState((v) => v.decks === 3);
+      expect(view.decks).toBe(3);
+    }
+  });
+
+  it("deals from every chosen pack once the round starts", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    clients[0]!.send({ t: "lobby.decks", decks: 2 });
+    await clients[0]!.waitForState((v) => v.decks === 2);
+    clients[0]!.send({ t: "lobby.start" });
+
+    const view = await clients[0]!.waitForState((v) => v.phase === "study");
+    // Two packs, less the dealt hands and the card turned up to seed the pile.
+    expect(view.deckCount).toBe(2 * CARDS_PER_DECK - 2 * HAND_SIZE - 1);
+  });
+
+  it("keeps the chosen pack count for the next round at the same table", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    clients[0]!.send({ t: "lobby.decks", decks: 2 });
+    await clients[0]!.waitForState((v) => v.decks === 2);
+    clients[0]!.send({ t: "lobby.start" });
+
+    const view = await clients[0]!.waitForState((v) => v.phase === "study");
+    expect(view.decks).toBe(2);
+  });
+
+  it("lets nobody but the host change the packs", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    clients[1]!.send({ t: "lobby.decks", decks: 3 });
+    const error = await clients[1]!.next("error");
+    expect(error.code).toBe("notHost");
+    expect(clients[1]!.latestState()?.decks).toBe(1);
+  });
+
+  it("refuses a pack count outside the range on offer", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    for (const decks of [0, 4, 2.5]) {
+      clients[0]!.send({ t: "lobby.decks", decks });
+      const error = await clients[0]!.next("error");
+      expect(error.code, String(decks)).toBe("malformed");
+    }
+    expect(clients[0]!.latestState()?.decks).toBe(1);
+  });
+
+  it("refuses to change the packs once the round is under way", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    clients[0]!.send({ t: "lobby.start" });
+    await clients[0]!.waitForState((v) => v.phase === "study");
+
+    clients[0]!.send({ t: "lobby.decks", decks: 3 });
+    const error = await clients[0]!.next("error");
+    expect(error.code).toBe("illegalAction");
+    expect(clients[0]!.latestState()?.decks).toBe(1);
+  });
+
+  it("starts on the default card back", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    const view = await clients[1]!.waitForState((v) => v.players.length === 2);
+    expect(view.back).toBe(DEFAULT_BACK);
+  });
+
+  it("lets the host choose the card back, and deals it to everyone", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    const wanted = CARD_BACKS[3]!.id;
+    clients[0]!.send({ t: "lobby.back", back: wanted });
+
+    for (const client of clients) {
+      const view = await client.waitForState((v) => v.back === wanted);
+      expect(view.back).toBe(wanted);
+    }
+  });
+
+  it("keeps the chosen back once the round is under way", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    const wanted = CARD_BACKS[2]!.id;
+    clients[0]!.send({ t: "lobby.back", back: wanted });
+    await clients[0]!.waitForState((v) => v.back === wanted);
+    clients[0]!.send({ t: "lobby.start" });
+
+    const view = await clients[0]!.waitForState((v) => v.phase === "study");
+    expect(view.back).toBe(wanted);
+  });
+
+  it("lets the host restyle the cards mid-round - it gives nothing away", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    clients[0]!.send({ t: "lobby.start" });
+    await clients[0]!.waitForState((v) => v.phase === "study");
+
+    const wanted = CARD_BACKS[5]!.id;
+    clients[0]!.send({ t: "lobby.back", back: wanted });
+    const view = await clients[1]!.waitForState((v) => v.back === wanted);
+    expect(view.back).toBe(wanted);
+  });
+
+  it("lets nobody but the host change the cards", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    clients[1]!.send({ t: "lobby.back", back: CARD_BACKS[1]!.id });
+    const error = await clients[1]!.next("error");
+    expect(error.code).toBe("notHost");
+    expect(clients[1]!.latestState()?.back).toBe(DEFAULT_BACK);
+  });
+
+  it("refuses a card back that does not exist", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    clients[0]!.send({ t: "lobby.back", back: "../secrets" });
+    const error = await clients[0]!.next("error");
+    expect(error.code).toBe("malformed");
+    expect(clients[0]!.latestState()?.back).toBe(DEFAULT_BACK);
   });
 
   it("begins play only once everyone is ready", async () => {

@@ -1,15 +1,26 @@
 import { useState } from "react";
-import { MAX_PLAYERS, MIN_PLAYERS, type GameView, type PlayerId } from "@cambio/shared";
+import {
+  CARDS_PER_DECK,
+  CARD_BACKS,
+  DECK_CHOICES,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  type GameView,
+  type PlayerId,
+} from "@cambio/shared";
+import { backImageUrl } from "../backs.js";
 
 export type LobbyProps = {
   view: GameView;
   me: PlayerId;
   onKick: (playerId: PlayerId) => void;
+  onDecks: (decks: number) => void;
+  onBack: (back: string) => void;
   onStart: () => void;
   onLeave: () => void;
 };
 
-export function Lobby({ view, me, onKick, onStart, onLeave }: LobbyProps): React.JSX.Element {
+export function Lobby({ view, me, onKick, onDecks, onBack, onStart, onLeave }: LobbyProps): React.JSX.Element {
   const [copied, setCopied] = useState(false);
   const amHost = view.players.find((p) => p.id === me)?.isHost === true;
   const enough = view.players.length >= MIN_PLAYERS;
@@ -60,6 +71,54 @@ export function Lobby({ view, me, onKick, onStart, onLeave }: LobbyProps): React
           </li>
         ))}
       </ul>
+
+      <section className="decks" aria-label="Decks in play">
+        <span className="decks__label">Decks</span>
+        <div className="decks__choices" role="group">
+          {DECK_CHOICES.map((count) => {
+            const chosen = view.decks === count;
+            return (
+              <button
+                key={count}
+                type="button"
+                className={`decks__choice${chosen ? " decks__choice--on" : ""}`}
+                aria-pressed={chosen}
+                disabled={!amHost}
+                onClick={() => onDecks(count)}
+                data-testid={`decks-${count}`}
+              >
+                {count}
+              </button>
+            );
+          })}
+        </div>
+        <p className="decks__hint" data-testid="decks-hint">
+          {view.decks * CARDS_PER_DECK} cards{view.decks > 1 ? " - matches come up far more often" : ""}
+        </p>
+      </section>
+
+      <section className="backs" aria-label="Card back">
+        <span className="backs__label">Cards</span>
+        <div className="backs__choices" role="group">
+          {CARD_BACKS.map((back) => {
+            const chosen = view.back === back.id;
+            return (
+              <button
+                key={back.id}
+                type="button"
+                className={`backs__choice${chosen ? " backs__choice--on" : ""}`}
+                style={{ backgroundImage: `url("${backImageUrl(back.id)}")` }}
+                aria-pressed={chosen}
+                aria-label={back.label}
+                title={back.label}
+                disabled={!amHost}
+                onClick={() => onBack(back.id)}
+                data-testid={`back-${back.id}`}
+              />
+            );
+          })}
+        </div>
+      </section>
 
       <div className="lobby__actions">
         {amHost ? (

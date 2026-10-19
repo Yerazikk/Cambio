@@ -1,4 +1,12 @@
-import { DEFAULT_RULES, type Card, type CardId, type PlayerId, type Phase, type RuleConfig } from "@cambio/shared";
+import {
+  DEFAULT_BACK,
+  DEFAULT_RULES,
+  type Card,
+  type CardId,
+  type PlayerId,
+  type Phase,
+  type RuleConfig,
+} from "@cambio/shared";
 import { orderedCambioDeck } from "../src/deck.js";
 import type { GameState, Seat } from "../src/engine/state.js";
 
@@ -38,7 +46,7 @@ export function fixture(spec: Fixture): GameState {
     name: id,
     connected: true,
     hand: [...(spec.hands[id] ?? [])],
-    initialPeeksUsed: 0,
+    initialPeeked: [],
     ready: true,
     calledCambio: false,
   }));
@@ -57,6 +65,7 @@ export function fixture(spec: Fixture): GameState {
     code: "TESTRM",
     version: 0,
     rules: { ...DEFAULT_RULES, ...spec.rules },
+    back: DEFAULT_BACK,
     phase: spec.phase ?? "awaitingAction",
     seats,
     hostId: spec.hostId ?? first,

@@ -4,9 +4,63 @@
 export const HAND_SIZE = 4;
 /** How many of your own cards you may study before the first turn. */
 export const INITIAL_PEEKS = 2;
+
+/**
+ * Whether a slot is one of the cards you may study before the first turn.
+ *
+ * Hands are laid out two to a row, and the studiable cards are the bottom row -
+ * the last `initialPeeks` slots. Fixing them by position rather than letting
+ * each player choose is what makes the opening the same deal for everyone, and
+ * what lets the table say "your bottom two" and mean something.
+ */
+export function isInitialPeekSlot(slot: number, handSize: number, initialPeeks: number): boolean {
+  return slot >= handSize - initialPeeks && slot < handSize;
+}
 /** Table size bounds. */
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
+
+/**
+ * How many packs the table plays with, and the range the host may pick from.
+ * More packs means more of every rank in play, so snaps come up far more often
+ * and the deck runs down more slowly.
+ */
+export const CARDS_PER_DECK = 54;
+export const DECKS = 1;
+export const MIN_DECKS = 1;
+export const MAX_DECKS = 3;
+
+/** The deck counts a host may choose between, for a picker to render. */
+export const DECK_CHOICES: readonly number[] = [1, 2, 3];
+
+/**
+ * The card backs on offer. Purely cosmetic - the back is the same for every
+ * card on the table, so it gives nothing away - but it is table-wide state, so
+ * the host picks it and everyone sees the same deck.
+ *
+ * `id` is both the choice sent over the wire and the artwork's filename under
+ * the client's `backs/` folder. Adding a back is a new SVG there plus a line
+ * here; nothing else needs to know.
+ */
+export type CardBack = { id: string; label: string };
+
+export const CARD_BACKS: readonly CardBack[] = [
+  { id: "navy-geometric", label: "Navy geometric" },
+  { id: "blue-celestial", label: "Blue celestial" },
+  { id: "purple-floral", label: "Purple floral" },
+  { id: "teal-floral", label: "Teal floral" },
+  { id: "red-grid", label: "Red grid" },
+  { id: "pink-hearts", label: "Pink hearts" },
+  { id: "gold-ornament", label: "Gold ornament" },
+  { id: "yellow-diamonds", label: "Yellow diamonds" },
+];
+
+/** The back a new table starts with. */
+export const DEFAULT_BACK = "navy-geometric";
+
+export function isCardBack(id: string): boolean {
+  return CARD_BACKS.some((back) => back.id === id);
+}
 
 /**
  * How long the arbiter waits, after the first snap lands, before deciding the
@@ -62,6 +116,7 @@ export const ROOM_CODE_LENGTH = 6;
 export const ROOM_REAP_IDLE_MS = 10 * 60_000;
 
 export type RuleConfig = {
+  decks: number;
   handSize: number;
   initialPeeks: number;
   snapWindowMs: number;
@@ -73,6 +128,7 @@ export type RuleConfig = {
 };
 
 export const DEFAULT_RULES: RuleConfig = {
+  decks: DECKS,
   handSize: HAND_SIZE,
   initialPeeks: INITIAL_PEEKS,
   snapWindowMs: SNAP_WINDOW_MS,

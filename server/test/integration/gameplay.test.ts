@@ -211,7 +211,7 @@ describe("hidden information", () => {
     ana!.send({ t: "lobby.start" });
     await Promise.all(clients.map((c) => c.waitForState((v) => v.phase === "study")));
 
-    ana!.act({ a: "initialPeek", slot: 0 });
+    ana!.act({ a: "initialPeek", slot: 2 });
     const revealed = await ana!.next("card.revealed");
 
     expect(revealed.ownerId).toBe(ana!.playerId);

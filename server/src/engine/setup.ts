@@ -1,4 +1,4 @@
-import { DEFAULT_RULES, type PlayerId, type RoomCode, type RuleConfig } from "@cambio/shared";
+import { DEFAULT_BACK, DEFAULT_RULES, type PlayerId, type RoomCode, type RuleConfig } from "@cambio/shared";
 import { genCambioDeck } from "../deck.js";
 import type { Rng } from "../rng.js";
 import type { GameState, Seat } from "./state.js";
@@ -9,6 +9,7 @@ export function emptyState(code: RoomCode, hostId: PlayerId, rules: RuleConfig =
   return {
     code,
     rules,
+    back: DEFAULT_BACK,
     phase: "lobby",
     version: 0,
     seats: [],
@@ -35,7 +36,7 @@ export function emptyState(code: RoomCode, hostId: PlayerId, rules: RuleConfig =
  * up to seed the discard pile, so a snap is legal from the first move.
  */
 export function startRound(state: GameState, rng: Rng): GameState {
-  const deck = genCambioDeck(rng);
+  const deck = genCambioDeck(rng, state.rules.decks);
   const cards = new Map(deck.map((c) => [c.id, c]));
   const ids = deck.map((c) => c.id);
 
@@ -43,7 +44,7 @@ export function startRound(state: GameState, rng: Rng): GameState {
   const seats: Seat[] = state.seats.map((seat) => ({
     ...seat,
     hand: ids.slice(cursor, (cursor += state.rules.handSize)),
-    initialPeeksUsed: 0,
+    initialPeeked: [],
     ready: false,
     calledCambio: false,
   }));
@@ -79,7 +80,7 @@ export function addSeat(state: GameState, spec: SeatSpec): GameState {
     name: spec.name,
     connected: true,
     hand: [],
-    initialPeeksUsed: 0,
+    initialPeeked: [],
     ready: false,
     calledCambio: false,
   };

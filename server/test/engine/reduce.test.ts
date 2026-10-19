@@ -49,23 +49,59 @@ describe("the study phase", () => {
     const state = studying();
     state.seats.forEach((s) => (s.ready = false));
 
-    const result = reduce(state, "ana", { a: "initialPeek", slot: 0 }, ctx);
+    const result = reduce(state, "ana", { a: "initialPeek", slot: 2 }, ctx);
     if (!result.ok) throw new Error(result.message);
 
-    expect(result.out).toHaveLength(1);
-    expect(result.out[0]?.to).toBe("ana");
-    const event = result.out[0]?.event;
-    expect(event?.t).toBe("card.revealed");
-    if (event?.t === "card.revealed") expect(event.card.id).toBe("S2");
+    const faces = result.out.filter((o) => o.event.t === "card.revealed");
+    expect(faces).toHaveLength(1);
+    expect(faces[0]?.to).toBe("ana");
+    const event = faces[0]?.event;
+    if (event?.t === "card.revealed") expect(event.card.id).toBe("S4");
+  });
+
+  it("tells the whole table which card was studied, but not what it is", () => {
+    const state = studying();
+    state.seats.forEach((s) => (s.ready = false));
+
+    const result = reduce(state, "ana", { a: "initialPeek", slot: 2 }, ctx);
+    if (!result.ok) throw new Error(result.message);
+
+    // Everyone sees you pick a card up at a real table; only you see its face.
+    const announced = result.out.filter((o) => o.event.t === "table.event");
+    expect(announced).toHaveLength(1);
+    expect(announced[0]?.to).toBe("all");
+    const event = announced[0]?.event;
+    if (event?.t === "table.event") {
+      expect(event.kind).toBe("peek");
+      expect(event.byId).toBe("ana");
+      expect(event.slots).toEqual([{ ownerId: "ana", slot: 2 }]);
+      expect(JSON.stringify(event)).not.toContain("S4");
+    }
   });
 
   it("allows exactly the configured number of initial peeks", () => {
     let state = studying();
     state.seats.forEach((s) => (s.ready = false));
 
-    state = ok(state, "ana", { a: "initialPeek", slot: 0 });
-    state = ok(state, "ana", { a: "initialPeek", slot: 1 });
+    state = ok(state, "ana", { a: "initialPeek", slot: 2 });
+    state = ok(state, "ana", { a: "initialPeek", slot: 3 });
     expect(rejected(state, "ana", { a: "initialPeek", slot: 2 })).toBe("illegalAction");
+  });
+
+  it("only lets you study the bottom row of your hand", () => {
+    const state = studying();
+    state.seats.forEach((s) => (s.ready = false));
+
+    expect(rejected(state, "ana", { a: "initialPeek", slot: 0 })).toBe("badSlot");
+    expect(rejected(state, "ana", { a: "initialPeek", slot: 1 })).toBe("badSlot");
+  });
+
+  it("refuses to study the same card twice", () => {
+    const state = studying();
+    state.seats.forEach((s) => (s.ready = false));
+
+    const once = ok(state, "ana", { a: "initialPeek", slot: 2 });
+    expect(rejected(once, "ana", { a: "initialPeek", slot: 2 })).toBe("illegalAction");
   });
 
   it("rejects studying a slot that does not exist", () => {
@@ -243,45 +279,112 @@ describe("powers", () => {
     });
   });
 
-  describe("jack and queen: blind swap", () => {
-    it("enters the blind-swap phase", () => {
+  describe("jack and queen: swap any two cards", () => {
+    it("enters the free-swap phase", () => {
       for (const card of ["S11", "S12"]) {
-        expect(trigger(card).phase, card).toBe("powerBlindSwap");
+        expect(trigger(card).phase, card).toBe("powerFreeSwap");
+        expect(trigger(card).pendingPower, card).toBe("freeSwap");
       }
-    });
-
-    it("exchanges the two cards and ends the turn", () => {
-      const state = trigger("S11");
-      const after = ok(state, "ana", { a: "blindSwap", mySlot: 0, targetId: "bo", targetSlot: 1 });
-
-      expect(after.seats[0]?.hand).toEqual(["C3", "S3", "S4", "S5"]);
-      expect(after.seats[1]?.hand).toEqual(["C2", "S2", "C4", "C5"]);
-      expect(after.phase).toBe("awaitingAction");
-    });
-
-    it("reveals nothing to anyone - that is what makes it blind", () => {
-      const state = trigger("S11");
-      const result = reduce(state, "ana", { a: "blindSwap", mySlot: 0, targetId: "bo", targetSlot: 1 }, ctx);
-      if (!result.ok) throw new Error(result.message);
-
-      expect(result.out.filter((o) => o.event.t === "card.revealed")).toHaveLength(0);
-      expect(knows(result.state, "C3", "ana")).toBe(false);
     });
 
     it("carries existing knowledge along with the swapped cards", () => {
       let state = trigger("S11");
       // Pretend Cy had previously peeked Bo's slot 1.
       state.knownBy.set("C3", new Set(["cy"]));
-      state = ok(state, "ana", { a: "blindSwap", mySlot: 0, targetId: "bo", targetSlot: 1 });
+      state = ok(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "bo", bSlot: 1 });
 
       // That card now sits in Ana's slot 0, and Cy still knows it.
       expect(state.seats[0]?.hand[0]).toBe("C3");
       expect(knows(state, "C3", "cy")).toBe(true);
     });
 
-    it("refuses a swap with yourself", () => {
-      const state = trigger("S11");
-      expect(rejected(state, "ana", { a: "blindSwap", mySlot: 0, targetId: "ana", targetSlot: 1 })).toBe("badTarget");
+    it("swaps one of yours for one of theirs", () => {
+      const state = ok(trigger("S12"), "ana", {
+        a: "freeSwap",
+        aId: "ana",
+        aSlot: 0,
+        bId: "bo",
+        bSlot: 1,
+      });
+
+      expect(state.seats[0]?.hand).toEqual(["C3", "S3", "S4", "S5"]);
+      expect(state.seats[1]?.hand).toEqual(["C2", "S2", "C4", "C5"]);
+      expect(state.phase).toBe("awaitingAction");
+    });
+
+    it("swaps two of your own cards", () => {
+      const state = ok(trigger("S12"), "ana", {
+        a: "freeSwap",
+        aId: "ana",
+        aSlot: 0,
+        bId: "ana",
+        bSlot: 3,
+      });
+
+      expect(state.seats[0]?.hand).toEqual(["S5", "S3", "S4", "S2"]);
+      expect(state.phase).toBe("awaitingAction");
+    });
+
+    it("swaps two cards between other players, leaving your own hand alone", () => {
+      const state = ok(trigger("S12"), "ana", {
+        a: "freeSwap",
+        aId: "bo",
+        aSlot: 0,
+        bId: "cy",
+        bSlot: 1,
+      });
+
+      expect(state.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
+      expect(state.seats[1]?.hand).toEqual(["D7", "C3", "C4", "C5"]);
+      expect(state.seats[2]?.hand).toEqual(["D6", "C2"]);
+    });
+
+    it("swaps two cards in a single opponent's hand", () => {
+      const state = ok(trigger("S12"), "ana", {
+        a: "freeSwap",
+        aId: "bo",
+        aSlot: 0,
+        bId: "bo",
+        bSlot: 2,
+      });
+
+      expect(state.seats[1]?.hand).toEqual(["C4", "C3", "C2", "C5"]);
+    });
+
+    it("reveals nothing - it moves cards without showing them", () => {
+      const result = reduce(
+        trigger("S12"),
+        "ana",
+        { a: "freeSwap", aId: "ana", aSlot: 0, bId: "bo", bSlot: 1 },
+        ctx,
+      );
+      if (!result.ok) throw new Error(result.message);
+
+      expect(result.out.filter((o) => o.event.t === "card.revealed")).toHaveLength(0);
+      expect(knows(result.state, "C3", "ana")).toBe(false);
+    });
+
+    it("refuses to swap a card with itself", () => {
+      const state = trigger("S12");
+      expect(rejected(state, "ana", { a: "freeSwap", aId: "bo", aSlot: 1, bId: "bo", bSlot: 1 })).toBe("badTarget");
+    });
+
+    it("refuses an unknown player or a missing slot", () => {
+      const state = trigger("S12");
+      expect(rejected(state, "ana", { a: "freeSwap", aId: "nobody", aSlot: 0, bId: "bo", bSlot: 0 })).toBe("badTarget");
+      expect(rejected(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "cy", bSlot: 9 })).toBe("badSlot");
+    });
+
+    it("is only one player's to resolve", () => {
+      const state = trigger("S12");
+      expect(rejected(state, "bo", { a: "freeSwap", aId: "bo", aSlot: 0, bId: "ana", bSlot: 0 })).toBe("notYourTurn");
+    });
+
+    it("may be declined like any other power", () => {
+      const state = ok(trigger("S12"), "ana", { a: "forfeitPower" });
+      expect(state.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
+      expect(state.phase).toBe("awaitingAction");
+      expect(state.turnIndex).toBe(1);
     });
   });
 
@@ -305,13 +408,32 @@ describe("powers", () => {
       expect(state.kingPeeked).toBe(true);
     });
 
-    it("swaps after looking", () => {
+    it("swaps one of yours for one of theirs after looking", () => {
       let state = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
-      state = ok(state, "ana", { a: "kingSwap", mySlot: 1, targetId: "bo", targetSlot: 0 });
+      state = ok(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 1, bId: "bo", bSlot: 0 });
 
       expect(state.seats[0]?.hand).toEqual(["S2", "C2", "S4", "S5"]);
       expect(state.seats[1]?.hand).toEqual(["S3", "C3", "C4", "C5"]);
       expect(state.phase).toBe("awaitingAction");
+    });
+
+    it("swaps any two cards after looking, not just one of yours for one of theirs", () => {
+      const peeked = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
+
+      // Two of your own.
+      const mine = ok(peeked, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "ana", bSlot: 3 });
+      expect(mine.seats[0]?.hand).toEqual(["S5", "S3", "S4", "S2"]);
+
+      // Two that are not yours at all.
+      const theirs = ok(peeked, "ana", { a: "freeSwap", aId: "bo", aSlot: 0, bId: "cy", bSlot: 1 });
+      expect(theirs.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
+      expect(theirs.seats[1]?.hand).toEqual(["D7", "C3", "C4", "C5"]);
+      expect(theirs.seats[2]?.hand).toEqual(["D6", "C2"]);
+    });
+
+    it("refuses to swap a card with itself", () => {
+      const state = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
+      expect(rejected(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "ana", bSlot: 0 })).toBe("badTarget");
     });
 
     it("passes after looking, leaving hands untouched", () => {
@@ -325,7 +447,9 @@ describe("powers", () => {
 
     it("insists you look before you swap or pass", () => {
       const state = trigger("S13");
-      expect(rejected(state, "ana", { a: "kingSwap", mySlot: 0, targetId: "bo", targetSlot: 0 })).toBe("illegalAction");
+      expect(rejected(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "bo", bSlot: 0 })).toBe(
+        "illegalAction",
+      );
       expect(rejected(state, "ana", { a: "kingSkip" })).toBe("illegalAction");
     });
 
@@ -342,7 +466,7 @@ describe("powers", () => {
 
   it("refuses a power action that does not match the pending power", () => {
     const state = trigger("S7"); // peek-own is pending
-    expect(rejected(state, "ana", { a: "blindSwap", mySlot: 0, targetId: "bo", targetSlot: 0 })).toBe("illegalAction");
+    expect(rejected(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "bo", bSlot: 0 })).toBe("illegalAction");
   });
 });
 

@@ -32,6 +32,47 @@ describe("deck composition", () => {
   });
 });
 
+describe("playing with more than one pack", () => {
+  it("deals 54 cards per pack", () => {
+    expect(orderedCambioDeck(1)).toHaveLength(54);
+    expect(orderedCambioDeck(2)).toHaveLength(108);
+    expect(orderedCambioDeck(3)).toHaveLength(162);
+  });
+
+  it("keeps every card id unique across packs", () => {
+    for (const packs of [1, 2, 3]) {
+      const deck = orderedCambioDeck(packs);
+      expect(new Set(deck.map((c) => c.id)).size, `${packs} packs`).toBe(deck.length);
+    }
+  });
+
+  it("leaves the first pack's ids untagged, so one pack is unchanged", () => {
+    const one = orderedCambioDeck(1).map((c) => c.id);
+    const three = orderedCambioDeck(3).map((c) => c.id);
+    expect(three.slice(0, one.length)).toEqual(one);
+  });
+
+  it("repeats every rank once per pack", () => {
+    const deck = orderedCambioDeck(3);
+    expect(deck.filter((c) => c.rank === 7 && c.suit === "S")).toHaveLength(3);
+    expect(deck.filter((c) => c.rank === "joker")).toHaveLength(6);
+  });
+
+  it("still scores every copy the same", () => {
+    for (const card of orderedCambioDeck(3)) {
+      expect(card.points, card.id).toBe(pointsFor(card.rank, card.suit));
+    }
+  });
+
+  it("shuffles the whole thing, not one pack at a time", () => {
+    const deck = genCambioDeck(mulberry32(7), 2);
+    expect(deck).toHaveLength(108);
+    expect(new Set(deck.map((c) => c.id)).size).toBe(108);
+    // A pack-at-a-time shuffle would leave the first half untagged.
+    expect(deck.slice(0, 54).some((c) => c.id.includes("#"))).toBe(true);
+  });
+});
+
 describe("scoring values", () => {
   it("scores aces as 1 and pips at face value", () => {
     expect(pointsFor(1, "S")).toBe(1);
@@ -77,8 +118,8 @@ describe("powers by rank", () => {
     expect(powerFor(8)).toBe("peekOwn");
     expect(powerFor(9)).toBe("peekOther");
     expect(powerFor(10)).toBe("peekOther");
-    expect(powerFor(11)).toBe("blindSwap");
-    expect(powerFor(12)).toBe("blindSwap");
+    expect(powerFor(11)).toBe("freeSwap");
+    expect(powerFor(12)).toBe("freeSwap");
     expect(powerFor(13)).toBe("king");
   });
 

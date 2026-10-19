@@ -6,9 +6,9 @@ race decided in milliseconds.
 
 ## The game
 
-Four cards each, dealt face down. You may study two of them before the first
-turn, and after that remembering them is your problem — the server shows a
-peeked card once and never again.
+Four cards each, dealt face down and laid out two by two. You may study your
+bottom two before the first turn, and after that remembering them is your
+problem — the server shows a peeked card once and never again.
 
 On your turn, draw from the deck or take the discard top. A card drawn from the
 deck can be swapped into your hand or discarded, and discarding a power card
@@ -18,11 +18,20 @@ triggers it:
 | --- | --- |
 | 7, 8 | Look at one of your own cards |
 | 9, 10 | Look at one of another player's cards |
-| J, Q | Blind swap one of yours for one of theirs |
-| K | Look at any card, then swap or pass |
+| J, Q | Swap any two cards on the table — two of yours, two of theirs, or one of each |
+| K | Look at any card, then swap any two cards - or pass |
 
 A card taken from the discard pile grants no power — it must go into your hand.
 Powers are optional; you may decline one.
+
+**Decks.** The host picks one, two, or three packs before the round starts. More
+packs means more of every rank on the table, so snaps come up far more often.
+
+**Cards.** The host also picks the back the table plays with. It is purely
+cosmetic - every card wears the same one, so it gives nothing away - and it can
+be changed at any point, mid-round included. The artwork lives in
+`client/public/backs`; a new back is an SVG dropped in there plus a line in
+`CARD_BACKS` in `shared/src/rules.ts`.
 
 **Scoring.** `A` = 1, pips at face value, `J`/`Q` = 10, a black `K` = 13, a red
 `K` = **-1**, and jokers = 0. The deck is 54 cards.
@@ -37,6 +46,41 @@ final turn, then all hands are revealed. Lowest total wins, and the caller wins
 ties — taking the risk earns the tiebreak. Call without the lowest hand and you
 take a 10-point penalty. Hands are revealed and scored, and the host can play
 another round with the same table.
+
+## The table
+
+You are looking down at one table from above. Everyone has a seat on its rim,
+spaced evenly round it - four players make a square, five a pentagon, six a
+hexagon - and the seats keep the order the players are listed in, so the person
+who plays after you is on your left and play runs clockwise. You are always at
+the bottom, facing your own hand, which means every player learns the same
+layout and the same place to look for their own cards.
+
+Your hand sits above the card you have temporarily drawn, and everyone else's
+drawn card sits beside theirs, out towards the middle of the felt. That is both
+where you would put a card down at a real table and the one direction a seat
+can grow without crowding its neighbour.
+
+### What everyone can see
+
+Cambio is played face down, which could make it opaque - someone across the
+table does something, and all you get is a new discard. So every move is
+broadcast in public terms and animates on every screen at the same moment:
+
+| You see | Because at a real table |
+| --- | --- |
+| A card lift and tip as someone looks at it | You watch them pick it up |
+| Both ends of a swap flip and settle | You watch the two cards cross |
+| A drawn card appear at a player's seat | You watch it leave the pile |
+| The face of a card taken off the discard | It was face up on the way out |
+| The snapped card shake, red | Someone slapped the table |
+
+What is never sent is the face of a card the viewer has not earned. The server
+announces the gesture and the slots it landed on - `{ kind, byId, slots }` - and
+nothing else, so you can see exactly which of someone's cards they just looked
+at and still have no idea what it was. Remembering it is their problem, and
+remembering that they looked is yours. A running log in the corner of the felt
+names the last few moves in words, for the half-second after one lands.
 
 ## How a snap race is decided
 
@@ -85,8 +129,9 @@ server/src/
 
 client/src/
   screens/           Home, Lobby, Table, GameOver
-  components/        Card, Hand, Piles, SnapBar, Toasts, TurnClock
-  state/useGame.ts   view, transient peeks, snap arming, toasts
+  components/        Card, Seat, Piles, SnapBar, TableLog, Toasts, TurnClock
+  seating.ts         where each player sits, as one formula
+  state/useGame.ts   view, transient peeks, move animations, snap arming
   net/socket.ts      typed client with auto-reconnect
 ```
 
@@ -99,10 +144,16 @@ no server and no timing flake.
 
 **Views are redacted per player, keyed on card instance.** Knowledge is tracked
 as `knownBy: Map<CardId, Set<PlayerId>>`, attached to the card rather than the
-slot it occupies. That is what makes a blind J/Q swap come out right: knowledge
+slot it occupies. That is what makes a sight-unseen J/Q swap come out right: knowledge
 travels with the card into its new hand. Every byte of table state a client
 receives goes through `viewFor`, and an integration test asserts over a whole
 round that no player is ever sent a card they hadn't earned.
+
+**Seating is geometry, not cases.** `seatRing` rotates the player list so the
+viewer is first, then walks it round an ellipse at `360 / n` degrees a step from
+the bottom. Every table size falls out of that one formula, and each seat
+arrives as a left/top percentage of the felt - so the ring reshapes itself with
+the window instead of needing a layout per player count.
 
 **One service, not two.** Express serves the built client on the same port as
 the WebSocket, so the page always opens its socket against its own origin. There
@@ -130,7 +181,7 @@ npm start       # serves the client and the socket on :8080
 ## Testing
 
 ```bash
-npm test         # 201 unit + integration tests (vitest)
+npm test         # 234 unit + integration tests (vitest)
 npm run test:e2e # browser tests (playwright)
 npm run test:all # both
 npm run typecheck
@@ -146,10 +197,13 @@ npm run typecheck
   revocation, host migration, refresh mid-game, grace expiry, a full round to
   scoring, latency-compensated races driven by delayed pongs, and the
   hidden-information leak assertion.
-- **E2E** — 33 tests in real browsers, one context per player: lobby and kick, a
+- **E2E** — 40 tests in real browsers, one context per player: lobby and kick, a
   reload mid-game, a round played entirely by clicking, playing again,
-  and two browsers racing a snap with one of them throttled, asserting the whole
-  table agrees on the winner.
+  two browsers racing a snap with one of them throttled, asserting the whole
+  table agrees on the winner, and the shared view of the table - that each
+  player sits in their own bottom seat with the others round them in order, and
+  that a move animates on the other player's screen without its face going with
+  it.
 
 Determinism is built in: the deck takes an injected seeded RNG, the reducer
 takes `now`, and the snap arbiter takes a clock and a scheduler, so a failing

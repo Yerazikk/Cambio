@@ -14,19 +14,27 @@ export function shuffle<T>(input: readonly T[], rng: Rng): T[] {
   return a;
 }
 
-/** An unshuffled 54-card Cambio deck: 52 standard cards plus two jokers. */
-export function orderedCambioDeck(): Card[] {
+/**
+ * An unshuffled Cambio deck: 52 standard cards plus two jokers, repeated once
+ * per pack. Card ids have to stay unique across the whole table because all
+ * knowledge is keyed on them, so every pack past the first tags its ids - the
+ * first pack keeps the bare `S7` form the fixtures are written in.
+ */
+export function orderedCambioDeck(packs = 1): Card[] {
   const cards: Card[] = [];
-  for (const suit of SUITS) {
-    for (const rank of NUMERIC_RANKS) {
-      cards.push(makeCard(rank, suit, `${suit}${rank}`));
+  for (let pack = 0; pack < packs; pack++) {
+    const tag = pack === 0 ? "" : `#${pack + 1}`;
+    for (const suit of SUITS) {
+      for (const rank of NUMERIC_RANKS) {
+        cards.push(makeCard(rank, suit, `${suit}${rank}${tag}`));
+      }
     }
+    cards.push(makeCard("joker", null, `X0${tag}`));
+    cards.push(makeCard("joker", null, `X1${tag}`));
   }
-  cards.push(makeCard("joker", null, "X0"));
-  cards.push(makeCard("joker", null, "X1"));
   return cards;
 }
 
-export function genCambioDeck(rng: Rng): Card[] {
-  return shuffle(orderedCambioDeck(), rng);
+export function genCambioDeck(rng: Rng, packs = 1): Card[] {
+  return shuffle(orderedCambioDeck(packs), rng);
 }

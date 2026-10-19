@@ -17,8 +17,8 @@ export type Seat = {
   connected: boolean;
   /** Slot index -> card. Length is variable: snaps shrink it, penalties grow it. */
   hand: CardId[];
-  /** Initial study phase bookkeeping. */
-  initialPeeksUsed: number;
+  /** Which slots this player studied before the first turn, in click order. */
+  initialPeeked: number[];
   ready: boolean;
   calledCambio: boolean;
 };
@@ -28,6 +28,11 @@ export type Held = { cardId: CardId; fromDiscard: boolean };
 export type GameState = {
   code: RoomCode;
   rules: RuleConfig;
+  /**
+   * The card back the table plays with. Cosmetic, and the same for every card,
+   * so it lives beside the rules rather than in them.
+   */
+  back: string;
   phase: Phase;
   /** Bumped on every accepted mutation. See GameView.version. */
   version: number;
@@ -40,8 +45,8 @@ export type GameState = {
   discard: CardId[];
   /**
    * Who has legitimately seen each card, keyed on the card rather than the slot
-   * it occupies. Keying on the card is what makes a blind J/Q swap come out
-   * right: knowledge travels with the card into its new hand, instead of
+   * it occupies. Keying on the card is what makes a sight-unseen J/Q swap come
+   * out right: knowledge travels with the card into its new hand, instead of
    * wrongly staying with the slot.
    */
   knownBy: Map<CardId, Set<PlayerId>>;
@@ -124,6 +129,8 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
     connected: seat.connected,
     isHost: seat.id === state.hostId,
     ready: seat.ready,
+    // Which cards a player chose to study is their own business.
+    peeked: seat.id === viewerId ? [...seat.initialPeeked] : [],
     calledCambio: seat.calledCambio,
     score: state.scores?.get(seat.id) ?? null,
     slots: seat.hand.map((cardId): SlotView => {
@@ -135,7 +142,13 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
 
   const turn = turnSeat(state);
   const isViewersTurn = turn?.id === viewerId;
-  const heldCard = state.held !== null && isViewersTurn ? (state.cards.get(state.held.cardId) ?? null) : null;
+  // That someone is holding a card is public - you can see it leave the pile.
+  // Its face is not, unless it came off the discard pile face up, in which
+  // case the whole table already read it on the way out.
+  const holder = state.held === null ? null : (turn?.id ?? null);
+  const heldPublic = state.held?.fromDiscard === true;
+  const heldCard =
+    state.held !== null && (isViewersTurn || heldPublic) ? (state.cards.get(state.held.cardId) ?? null) : null;
 
   return {
     code: state.code,
@@ -145,9 +158,12 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
     players,
     turnPlayerId: turn?.id ?? null,
     turnEndsAt: state.turnEndsAt,
+    decks: state.rules.decks,
+    back: state.back,
     deckCount: state.deck.length,
     discardTop: discardTopCard(state),
     discardCount: state.discard.length,
+    heldBy: holder,
     heldCard,
     heldFromDiscard: state.held?.fromDiscard ?? false,
     pendingPower: isViewersTurn ? state.pendingPower : null,
@@ -165,7 +181,7 @@ export const PHASES_IN_ROUND: readonly Phase[] = [
   "holdingCard",
   "powerPeekOwn",
   "powerPeekOther",
-  "powerBlindSwap",
+  "powerFreeSwap",
   "powerKing",
   "snapGiveCard",
 ];

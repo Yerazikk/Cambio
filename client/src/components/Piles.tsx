@@ -8,6 +8,9 @@ export type PilesProps = {
   canDrawDeck: boolean;
   canDrawDiscard: boolean;
   snapArmed: boolean;
+  /** Set briefly when a card has just come off or landed on that pile. */
+  deckMoved: boolean;
+  discardMoved: boolean;
   onDrawDeck: () => void;
   onDrawDiscard: () => void;
 };
@@ -19,12 +22,14 @@ export function Piles({
   canDrawDeck,
   canDrawDiscard,
   snapArmed,
+  deckMoved,
+  discardMoved,
   onDrawDeck,
   onDrawDiscard,
 }: PilesProps): React.JSX.Element {
   return (
     <div className="piles">
-      <div className="pile">
+      <div className={`pile${deckMoved ? " pile--moved" : ""}`}>
         <CardFace
           card={null}
           size="large"
@@ -37,7 +42,7 @@ export function Piles({
         </span>
       </div>
 
-      <div className="pile">
+      <div className={`pile${discardMoved ? " pile--moved" : ""}`}>
         <CardFace
           card={discardTop}
           size="large"
