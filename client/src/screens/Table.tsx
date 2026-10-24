@@ -14,6 +14,8 @@ export type TableProps = {
   me: PlayerId;
   snapArmed: boolean;
   snapPending: boolean;
+  /** Set while a fresh hand is on its way out to the seats. */
+  dealing: boolean;
   pick: PickOne;
   log: LogLine[];
   act: (action: Action) => void;
@@ -29,13 +31,15 @@ export type TableProps = {
 type SlotState = "idle" | "targetable" | "selected" | "snap";
 
 export function Table(props: TableProps): React.JSX.Element {
-  const { view, me, snapArmed, snapPending, pick, log, act, snap, armSnap, setPick } = props;
+  const { view, me, snapArmed, snapPending, dealing, pick, log, act, snap, armSnap, setPick } = props;
   const { revealFor, flashFor, pileFlash, onLeave } = props;
 
   const myTurn = view.turnPlayerId === me;
   const mySeat = view.players.find((p) => p.id === me);
   const ownSlots = mySeat?.slots.length ?? 0;
   const iOweACard = view.snapDebt?.snapperId === me;
+  /** A card drawn from the deck can be thrown away - from the button or the pile. */
+  const canDiscardDrawn = myTurn && view.phase === "holdingCard" && !view.heldFromDiscard;
 
   /**
    * Keyboard is the fast path that makes the race winnable: S arms snapping and
@@ -153,7 +157,7 @@ export function Table(props: TableProps): React.JSX.Element {
   const ring = seatRing(view.players, me);
 
   return (
-    <main className="table" data-players={view.players.length}>
+    <main className="table" data-players={view.players.length} data-dealing={dealing ? "" : undefined}>
       <header className="table__bar">
         <span className="table__code">{view.code}</span>
         <span className="table__status" data-testid="prompt">
@@ -177,11 +181,13 @@ export function Table(props: TableProps): React.JSX.Element {
             discardCount={view.discardCount}
             canDrawDeck={myTurn && view.phase === "awaitingAction"}
             canDrawDiscard={myTurn && view.phase === "awaitingAction" && view.discardTop !== null}
+            canDiscardDrawn={canDiscardDrawn}
             snapArmed={snapArmed}
             deckMoved={pileFlash("deck")}
             discardMoved={pileFlash("discard")}
             onDrawDeck={() => act({ a: "drawDeck" })}
             onDrawDiscard={() => act({ a: "drawDiscard" })}
+            onDiscardDrawn={() => act({ a: "discardDrawn" })}
           />
         </div>
 
@@ -240,7 +246,7 @@ export function Table(props: TableProps): React.JSX.Element {
             choice of what to do with it belongs down here with the rest of the
             turn's buttons.
           */}
-          {myTurn && view.phase === "holdingCard" && !view.heldFromDiscard && (
+          {canDiscardDrawn && (
             <button
               type="button"
               className="button"

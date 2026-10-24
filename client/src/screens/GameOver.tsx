@@ -10,13 +10,17 @@ export type GameOverProps = {
 export function GameOver({ view, me, onRestart, onLeave }: GameOverProps): React.JSX.Element {
   const ranked = [...view.players].sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
   const winner = view.players.find((p) => p.id === view.winnerId);
+  const caller = view.players.find((p) => p.calledCambio);
   const amHost = view.players.find((p) => p.id === me)?.isHost === true;
 
   return (
     <section className="over" data-testid="game-over">
-      <h2 className="over__title">
-        {view.winnerId === me ? "You win" : `${winner?.name ?? "Nobody"} wins`}
-      </h2>
+      <h2 className="over__title">{view.winnerId === me ? "You win" : `${winner?.name ?? "Nobody"} wins`}</h2>
+      <p className="over__sub">
+        {caller === undefined
+          ? "The round ended on an empty hand."
+          : `${caller.id === me ? "You" : caller.name} called Cambio. Lowest hand wins, and the caller takes ties.`}
+      </p>
 
       <ol className="over__scores">
         {ranked.map((player, index) => (
@@ -24,10 +28,10 @@ export function GameOver({ view, me, onRestart, onLeave }: GameOverProps): React
             <span className="over__rank">{index + 1}</span>
             <span className="over__name">
               {player.name}
-              {player.calledCambio && <span className="seat__called">called</span>}
-            </span>
-            <span className="over__cards">
-              {player.slots.map((slot) => (slot.known ? labelOf(slot.card.rank) : "?")).join(" ")}
+              {player.calledCambio && <span className="chip chip--red">called</span>}
+              <span className="over__cards">
+                {player.slots.map((slot) => (slot.known ? labelOf(slot.card.rank) : "?")).join("  ")}
+              </span>
             </span>
             <span className="over__score" data-testid={`final-${player.name}`}>
               {player.score}

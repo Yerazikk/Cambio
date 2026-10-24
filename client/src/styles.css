@@ -1,17 +1,60 @@
+/*
+ * Cambio, in paper and ink.
+ *
+ * The table is white - the colour of a card, of a sheet of paper, of the felt
+ * on a good table under good light. Nothing on it is coloured for decoration:
+ * ink for what you read, brass for whose turn it is, green for a choice you
+ * have made, red for a snap. Everything else is a hairline and a shadow.
+ */
+
 :root {
-  --felt: #0f5132;
-  --felt-dark: #0a3a24;
-  --ink: #0d1117;
-  --paper: #fdfdfb;
-  --line: rgba(255, 255, 255, 0.14);
-  --text: #f2f5f3;
-  --muted: rgba(242, 245, 243, 0.62);
-  --accent: #ffc53d;
-  --good: #2fbf71;
-  --bad: #e5484d;
-  --radius: 10px;
-  --shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-  color-scheme: dark;
+  /* ---- ground */
+  --bg: #f4f3ef;
+  --bg-top: #fbfaf7;
+  --paper: #ffffff;
+  --surface: #fdfcfa;
+  --sunk: #efeee9;
+
+  /* ---- ink */
+  --ink: #16181d;
+  --text: #1c1e24;
+  --muted: #6e737c;
+  --faint: #9ba0a9;
+  --line: rgba(22, 24, 29, 0.09);
+  --line-strong: rgba(22, 24, 29, 0.16);
+
+  /* ---- the four things colour is allowed to mean */
+  --brass: #a87f2b;
+  --brass-soft: rgba(168, 127, 43, 0.1);
+  --green: #1f7a56;
+  --green-soft: rgba(31, 122, 86, 0.1);
+  --red: #c0352f;
+  --red-soft: rgba(192, 53, 47, 0.1);
+  --blue: #3a6ea5;
+  --blue-soft: rgba(58, 110, 165, 0.1);
+
+  /* ---- form */
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 16px;
+  --e1: 0 1px 2px rgba(22, 24, 29, 0.05), 0 1px 1px rgba(22, 24, 29, 0.04);
+  --e2: 0 1px 2px rgba(22, 24, 29, 0.05), 0 6px 14px -6px rgba(22, 24, 29, 0.16);
+  --e3: 0 2px 4px rgba(22, 24, 29, 0.05), 0 18px 32px -12px rgba(22, 24, 29, 0.2);
+  --card-shadow: 0 1px 1px rgba(22, 24, 29, 0.07), 0 3px 7px -3px rgba(22, 24, 29, 0.16);
+  --card-shadow-lift: 0 2px 3px rgba(22, 24, 29, 0.06), 0 14px 22px -10px rgba(22, 24, 29, 0.28);
+
+  /* ---- motion. One easing for settling, one for turning over. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-io: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-back: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-flip: cubic-bezier(0.45, 0.04, 0.25, 1);
+  --flip-ms: 520ms;
+
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  color-scheme: light;
 }
 
 * {
@@ -20,10 +63,15 @@
 
 body {
   margin: 0;
-  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 15px/1.55 var(--sans);
   color: var(--text);
-  background: radial-gradient(ellipse at 50% 0%, var(--felt) 0%, var(--felt-dark) 70%, #062315 100%);
+  background: var(--bg);
+  /* The light falls from above, as it would over a table. */
+  background-image: radial-gradient(130% 80% at 50% -14%, var(--bg-top) 0%, var(--bg) 62%, #eceae4 100%);
+  background-attachment: fixed;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .app {
@@ -32,103 +80,223 @@ body {
   flex-direction: column;
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--serif);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+::selection {
+  background: rgba(168, 127, 43, 0.22);
+}
+
 /* ------------------------------------------------------------------ atoms */
 
 .button {
   font: inherit;
-  font-weight: 600;
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.6rem 1.1rem;
+  font-weight: 550;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 0.62rem 1.1rem;
   cursor: pointer;
-  transition: background 120ms ease, transform 80ms ease;
+  box-shadow: var(--e1);
+  transition:
+    background 140ms var(--ease-io),
+    border-color 140ms var(--ease-io),
+    box-shadow 160ms var(--ease-out),
+    transform 140ms var(--ease-out),
+    color 140ms var(--ease-io);
 }
 .button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(22, 24, 29, 0.28);
+  box-shadow: var(--e2);
+  transform: translateY(-1px);
 }
 .button:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: translateY(0);
+  box-shadow: var(--e1);
+}
+.button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 .button:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
 }
+
 .button--primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #3d2c00;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
 }
 .button--primary:hover:not(:disabled) {
-  background: #ffd469;
+  background: #2b2f37;
+  border-color: #2b2f37;
 }
+
 .button--danger {
-  background: var(--bad);
-  border-color: var(--bad);
+  color: var(--red);
+  border-color: rgba(192, 53, 47, 0.3);
+  background: var(--paper);
 }
+.button--danger:hover:not(:disabled) {
+  background: var(--red-soft);
+  border-color: rgba(192, 53, 47, 0.5);
+}
+
 .button--ghost {
   background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--muted);
 }
+.button--ghost:hover:not(:disabled) {
+  background: rgba(22, 24, 29, 0.05);
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--ink);
+}
+
 .button--small {
-  padding: 0.35rem 0.7rem;
-  font-size: 0.85rem;
+  padding: 0.34rem 0.72rem;
+  font-size: 0.84rem;
+  border-radius: var(--r-sm);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 .field__label {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
+  letter-spacing: 0.1em;
+  color: var(--faint);
 }
 .field__input {
   font: inherit;
-  padding: 0.65rem 0.8rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.3);
-  color: var(--text);
+  padding: 0.68rem 0.85rem;
+  border-radius: var(--r);
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: inset 0 1px 2px rgba(22, 24, 29, 0.04);
+  transition:
+    border-color 140ms var(--ease-io),
+    box-shadow 160ms var(--ease-out);
 }
-.field__input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.field__input::placeholder {
+  color: #c2c6cc;
+}
+.field__input:hover {
+  border-color: rgba(22, 24, 29, 0.24);
+}
+.field__input:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(22, 24, 29, 0.08);
 }
 .field__input--code {
   text-transform: uppercase;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.3em;
+  font-family: var(--mono);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 kbd {
-  font: 600 0.78em ui-monospace, monospace;
-  background: rgba(0, 0, 0, 0.4);
+  font: 600 0.74em/1.4 var(--mono);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 0.14em 0.4em;
+  color: var(--ink);
+}
+
+/* A chip: the smallest piece of furniture on the table. */
+.chip {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.14rem 0.42rem;
+  border-radius: 999px;
   border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0.1em 0.38em;
+  background: var(--paper);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.chip--brass {
+  border-color: rgba(168, 127, 43, 0.3);
+  background: var(--brass-soft);
+  color: #8a6720;
+}
+.chip--red {
+  border-color: transparent;
+  background: var(--red);
+  color: #fff;
+}
+.chip--quiet {
+  background: transparent;
+  color: var(--faint);
 }
 
 .banner {
-  padding: 0.55rem 1rem;
+  padding: 0.6rem 1rem;
   text-align: center;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--paper);
   border-bottom: 1px solid var(--line);
   display: flex;
   gap: 0.75rem;
   justify-content: center;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+  box-shadow: var(--e1);
+  animation: banner-in 320ms var(--ease-out);
 }
 .banner--bad {
-  background: var(--bad);
+  background: var(--red);
+  border-color: transparent;
+  color: #fff;
+}
+.banner--bad .button {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  box-shadow: none;
+}
+.banner--bad .button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+@keyframes banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
 }
 
 /* ------------------------------------------------------------------ cards */
 
+/*
+ * A card is a real object with two sides. The element itself is only a frame -
+ * it carries no paint - and inside it the two faces sit back to back on a
+ * plane that turns. Face up or face down is one class on the frame, so turning
+ * a card over is a transition rather than a swap of markup, and the flip you
+ * see is the same flip every time: your own peek, a power played across the
+ * table, or every hand being shown at the end of a round.
+ */
 .card {
   position: relative;
   /*
@@ -138,18 +306,19 @@ kbd {
    */
   width: var(--card-w, 52px);
   height: var(--card-h, 74px);
-  border-radius: 7px;
-  border: 1px solid rgba(0, 0, 0, 0.35);
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.05rem;
-  padding: 0;
-  font: inherit;
+  /* The corner of a cut card is a fraction of its width, not a fixed radius. */
+  --card-r: max(3px, calc(var(--card-w, 52px) * 0.085));
+  border-radius: var(--card-r);
   flex: none;
-  transition: transform 120ms ease, box-shadow 120ms ease, outline-color 120ms ease;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  transform-style: preserve-3d;
+  transition: transform 200ms var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
 }
 .card--small {
   width: calc(var(--card-w, 52px) * 0.77);
@@ -160,22 +329,45 @@ kbd {
   height: calc(var(--card-h, 74px) * 1.27);
 }
 
-.card--up {
-  background: var(--paper);
-  color: var(--ink);
+.card__inner {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-style: preserve-3d;
+  transition: transform var(--flip-ms) var(--ease-flip);
 }
-.card--red {
-  color: #c62828;
+/* The one line that turns every card in the game over. */
+.card--down > .card__inner {
+  transform: rotateY(180deg);
 }
-/*
- * A face-down card wears the table's chosen back. The gradient stays underneath
- * as the ground the artwork is painted on, so a back that has not loaded yet -
- * or a table with none set - still reads as a card rather than a blank.
- */
-.card--down {
-  background: linear-gradient(135deg, #1d4ed8 0%, #16307c 60%, #0f1f52 100%);
-  color: transparent;
+
+.card__face {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow: var(--card-shadow);
+}
+.card__face--front {
+  background: var(--paper);
+  color: var(--suit, var(--ink));
+  /* The hairline a printed card has, just inside its own edge. */
+  border: 1px solid rgba(22, 24, 29, 0.1);
+}
+.card__face--back {
+  transform: rotateY(180deg);
+  /*
+   * The ground the artwork is painted on, so a back that has not loaded yet -
+   * or a table with none set - still reads as a card rather than a hole.
+   */
+  background: #e9ebef;
+  border: 1px solid rgba(22, 24, 29, 0.12);
 }
 .card__art {
   position: absolute;
@@ -185,96 +377,834 @@ kbd {
   background-position: center;
   border-radius: inherit;
 }
+
+.card--red {
+  --suit: var(--red);
+}
+
 .card__rank {
-  font-size: 1.15rem;
+  font-size: calc(var(--card-w, 52px) * 0.46);
   font-weight: 700;
   line-height: 1;
-}
-.card--large .card__rank {
-  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 .card__suit {
-  font-size: 1rem;
+  font-size: calc(var(--card-w, 52px) * 0.32);
   line-height: 1;
+  margin-top: 0.1em;
+}
+.card--large .card__rank {
+  font-size: calc(var(--card-w, 52px) * 0.44);
+}
+.card--large .card__suit {
+  font-size: calc(var(--card-w, 52px) * 0.3);
 }
 .card__joker {
-  font-size: 0.6rem;
+  font-size: calc(var(--card-w, 52px) * 0.18);
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
 }
+/*
+ * The number of a slot in your own hand, which is also the key that snaps it.
+ * It is printed on the frame rather than on either face, so it stays upright
+ * and legible through a flip and over any card back.
+ */
 .card__tag {
   position: absolute;
+  right: 2px;
   bottom: 2px;
-  right: 4px;
-  font-size: 0.6rem;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(22, 24, 29, 0.08);
+  font-size: 0.56rem;
+  font-weight: 700;
+  line-height: 1;
   color: var(--muted);
-  font-weight: 600;
-}
-.card--up .card__tag {
-  color: rgba(0, 0, 0, 0.4);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  z-index: 3;
 }
 
-.card--targetable {
-  cursor: pointer;
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+/*
+ * A ring says what a card is right now: brass for one you may click, green for
+ * one you have chosen, red for one in the middle of a snap. It is drawn on the
+ * frame rather than the faces, so it holds still and stays legible while the
+ * card itself turns over.
+ */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: calc(var(--card-r) + 3px);
+  border: 1.5px solid var(--ring, transparent);
+  transition: border-color 180ms var(--ease-io);
+  pointer-events: none;
+  z-index: 2;
 }
-.card--targetable:hover {
-  transform: translateY(-5px);
-}
-.card--selected {
-  cursor: pointer;
-  outline: 3px solid var(--good);
-  outline-offset: 2px;
-  transform: translateY(-5px);
-}
+
+.card--targetable,
+.card--selected,
 .card--snap {
   cursor: pointer;
-  outline: 2px dashed var(--bad);
-  outline-offset: 2px;
-  animation: pulse 900ms ease-in-out infinite;
 }
-@keyframes pulse {
+.card--targetable {
+  --ring: var(--brass);
+}
+.card--targetable:hover,
+.card--targetable:focus-visible {
+  transform: translateY(-6px);
+}
+.card--targetable:hover > .card__inner > .card__face,
+.card--selected > .card__inner > .card__face {
+  box-shadow: var(--card-shadow-lift);
+}
+.card--selected {
+  --ring: var(--green);
+  transform: translateY(-6px);
+}
+.card--snap {
+  --ring: var(--red);
+}
+/* A live snap target breathes, because it is asking to be hit. */
+.card--snap::after {
+  animation: snap-ring 1.15s var(--ease-io) infinite;
+}
+@keyframes snap-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(192, 53, 47, 0.32);
+  }
+  55% {
+    box-shadow: 0 0 0 7px rgba(192, 53, 47, 0);
+  }
+}
+.card:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 4px;
+}
+
+/* ------------------------------------------------------ what just happened */
+
+/*
+ * Every move animates on every screen at the same moment. Cambio is played
+ * face down, so this is what keeps it readable: you cannot see what a card is,
+ * but you can see it being picked up, traded or slapped, exactly as you would
+ * across a real table.
+ *
+ * The ring stays for as long as the move is live, so a player who glances over
+ * a beat late still sees which card it was; the motion on top of it is for
+ * whoever was watching when it landed. Brass is a look, blue a trade, green a
+ * card arriving, red a snap or a penalty.
+ */
+.card--did-peek,
+.card--did-swap,
+.card--did-replace,
+.card--did-give,
+.card--did-penalty,
+.card--did-snap {
+  z-index: 3;
+}
+.card--did-peek {
+  --ring: var(--brass);
+}
+.card--did-swap {
+  --ring: var(--blue);
+}
+.card--did-replace,
+.card--did-give {
+  --ring: var(--green);
+}
+.card--did-penalty,
+.card--did-snap {
+  --ring: var(--red);
+}
+
+/*
+ * The gestures move the frame; the flip turns the plane inside it. Keeping
+ * them on separate elements is what lets both happen at once - the player who
+ * plays a seven watches their own card lift off the table and turn face up in
+ * the same movement, and everyone else watches the same lift with the card
+ * staying face down.
+ */
+
+/* Picked up, tipped towards its owner, put back down. */
+.card--did-peek {
+  animation: did-peek 900ms var(--ease-io);
+}
+@keyframes did-peek {
+  0%,
+  100% {
+    transform: none;
+  }
+  34%,
+  62% {
+    transform: translateY(-10px) scale(1.07) rotateX(18deg);
+  }
+}
+/* Lifted, turned and set down again - one end of a trade crossing. */
+.card--did-swap {
+  animation: did-swap 900ms var(--ease-io);
+}
+@keyframes did-swap {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translate(-6px, -15px) rotate(-8deg) scale(1.05);
+  }
+  68% {
+    transform: translate(5px, -5px) rotate(5deg) scale(1.02);
+  }
+}
+/* Dropped into the slot from above, settling once. */
+.card--did-replace,
+.card--did-give {
+  animation: did-land 760ms var(--ease-back);
+}
+@keyframes did-land {
+  0% {
+    opacity: 0.35;
+    transform: translateY(-26px) scale(1.16);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Slapped. */
+.card--did-penalty,
+.card--did-snap {
+  animation: did-snap 620ms var(--ease-io);
+}
+@keyframes did-snap {
+  0%,
+  100% {
+    transform: none;
+  }
+  12%,
+  44% {
+    transform: translateX(-5px) scale(1.07);
+  }
+  28%,
+  60% {
+    transform: translateX(5px) scale(1.07);
+  }
+}
+
+/* --------------------------------------------------------------- the deal */
+
+/*
+ * Cards come off the middle of the table and out to the seats, one after
+ * another, round the ring in turn order. It is what you watch at a real table,
+ * and it is also the clearest statement the screen can make about who is
+ * playing and in what order - every hand on the table names itself once,
+ * before a single card has been looked at.
+ */
+.table[data-dealing] .seat .card {
+  animation: deal 440ms var(--ease-out) both;
+  animation-delay: calc((var(--seat-order, 0) * 4 + var(--slot-i, 0)) * 34ms);
+}
+@keyframes deal {
+  from {
+    opacity: 0;
+    transform: translate(var(--deal-x, 0px), var(--deal-y, 0px)) scale(0.82) rotate(var(--deal-spin, -7deg));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ table */
+
+/*
+ * The table is seen from above: one surface in the middle, the piles at its
+ * centre, and a seat for every player spaced evenly round the rim. You are
+ * always at the bottom, and the rest keep their order in the player list, so
+ * four players make a square, five a pentagon, six a hexagon - the geometry is
+ * computed in `seating.ts` and arrives as a left/top percentage per seat.
+ *
+ * Cards stay the right way up at every seat. A genuinely rotated hand is how a
+ * real table looks, but a name and a rank read upside down from the far side
+ * of it are no use to anyone, and the ring itself already says who sits where.
+ */
+/*
+ * One number sets the scale of everything on the felt. It follows whichever
+ * of the two viewport dimensions is the tighter, because the ring needs both:
+ * a short window runs the far seat into the piles just as surely as a narrow
+ * one runs the side seats into them.
+ */
+.table {
+  --card-w: clamp(28px, min(3.9vw, 5.6vh), 52px);
+  --card-h: calc(var(--card-w) * 1.42);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-block: 0.6rem 1rem;
+  padding-inline: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
+}
+/* A fuller table gets smaller cards, so the ring stays the same ring. */
+.table[data-players="5"],
+.table[data-players="6"] {
+  --card-w: clamp(26px, min(3.3vw, 4.8vh), 46px);
+}
+
+.table__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--line);
+}
+.table__code {
+  font: 600 0.74rem/1 var(--mono);
+  letter-spacing: 0.16em;
+  color: var(--faint);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.34rem 0.66rem;
+  background: var(--paper);
+}
+/*
+ * One line telling the player what the table is waiting for. It is the only
+ * instruction on screen, so it gets the weight: it changes on every phase, and
+ * a short cross-fade is what stops a change from going unnoticed.
+ */
+.table__status {
+  flex: 1 1 14rem;
+  font-weight: 550;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  animation: status-in 260ms var(--ease-out);
+}
+@keyframes status-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+.table__right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* So it keeps to the right even on a narrow window, where the bar wraps. */
+  margin-left: auto;
+}
+.clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--faint);
+  min-width: 2.6ch;
+  text-align: right;
+}
+.clock--urgent {
+  color: var(--red);
+  animation: clock-tick 1s steps(1, end) infinite;
+}
+@keyframes clock-tick {
   50% {
-    outline-color: #ff9b9d;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .card,
-  .card--snap,
-  .pile--moved .card,
-  .seat__held,
-  [class*="card--did-"] {
-    animation: none;
-    transition: none;
+    opacity: 0.45;
   }
 }
 
-/* ------------------------------------------------------------------- home */
+/* --------------------------------------------------------------- the felt */
 
+.felt {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  /*
+   * Seats are placed as a percentage of this box, so it takes every row of
+   * height going: the vertical axis is the tight one, with the far seat, the
+   * piles and your own seat all having to clear each other on it.
+   */
+  min-height: 25rem;
+  margin: 0 auto;
+}
+/*
+ * The surface. White, like the table it is meant to be - a sheet of light with
+ * an edge, rather than a slab of colour. Two hairlines do the work: one at the
+ * rim and one set in from it, which is the embossed edge a good card table has
+ * and the only ornament on the whole screen.
+ */
+.felt__surface {
+  position: absolute;
+  inset: 5% 4%;
+  border-radius: 50%;
+  background:
+    radial-gradient(118% 92% at 50% 16%, #ffffff 0%, var(--surface) 46%, #f1efe9 100%);
+  border: 1px solid rgba(22, 24, 29, 0.08);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 0 40px rgba(22, 24, 29, 0.025),
+    0 1px 2px rgba(22, 24, 29, 0.04),
+    0 34px 60px -34px rgba(22, 24, 29, 0.22);
+}
+.felt__surface::after {
+  content: "";
+  position: absolute;
+  inset: clamp(8px, 2.2%, 20px);
+  border-radius: 50%;
+  border: 1px solid rgba(22, 24, 29, 0.05);
+}
+
+.felt__middle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+/* A pool of shade under the piles, so the middle of the table has a floor. */
+.felt__middle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  width: calc(var(--card-w) * 7);
+  height: calc(var(--card-w) * 4.6);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(22, 24, 29, 0.055), rgba(22, 24, 29, 0) 70%);
+  pointer-events: none;
+}
+
+/* -------------------------------------------------------------- the piles */
+
+.piles {
+  display: flex;
+  gap: calc(var(--card-w) * 0.5);
+  perspective: 1200px;
+}
+.pile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+/*
+ * A deck is a stack, not a card, so two thin edges sit behind the top card.
+ * It is the one place on the table where depth is information: you can see at
+ * a glance that there is something left to draw.
+ */
+.pile__stack {
+  position: relative;
+  /* Its own stacking context, so the edges below sit under the top card. */
+  z-index: 0;
+}
+.pile__stack::before,
+.pile__stack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: max(3px, calc(var(--card-w) * 0.085));
+  background: #f2f1ed;
+  border: 1px solid rgba(22, 24, 29, 0.1);
+  box-shadow: 0 1px 1px rgba(22, 24, 29, 0.05);
+}
+.pile__stack::before {
+  transform: translate(3px, 3px);
+}
+.pile__stack::after {
+  transform: translate(1.5px, 1.5px);
+}
+.pile__label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.pile__label strong {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* A pile that has just been drawn from or added to, so the movement is seen. */
+.pile--moved .card {
+  animation: pile-moved 700ms var(--ease-out);
+}
+@keyframes pile-moved {
+  0% {
+    transform: translateY(-12px) scale(1.06);
+  }
+  100% {
+    transform: none;
+  }
+}
+.pile--moved .card::after {
+  animation: pile-ring 700ms var(--ease-out);
+}
+@keyframes pile-ring {
+  0% {
+    border-color: var(--brass);
+  }
+  100% {
+    border-color: transparent;
+  }
+}
+/* -------------------------------------------------------------- the seats */
+
+.seat {
+  position: absolute;
+  /*
+   * Seats are centred on their point on the ring, except at the very top and
+   * bottom, where they are tucked back towards the middle so a tall seat
+   * cannot push past the edge of the felt and into the controls.
+   */
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.4rem 0.55rem 0.5rem;
+  border-radius: var(--r-lg);
+  transition:
+    background 220ms var(--ease-io),
+    box-shadow 240ms var(--ease-out),
+    opacity 220ms var(--ease-io);
+}
+/*
+ * The seats on the vertical axis are tucked back off their point on the ring,
+ * away from the piles in the middle and away from the edge of the table. They
+ * are the only two that have anything to clear.
+ */
+.seat--bottom {
+  transform: translate(-50%, -62%);
+}
+.seat--top {
+  transform: translate(-50%, -40%);
+}
+/*
+ * Whose turn it is, said once: a warm plate under the seat and a brass
+ * nameplate. Nothing else on the table is brass, so there is never a question
+ * about where the game is.
+ */
+.seat--turn {
+  background: linear-gradient(180deg, rgba(168, 127, 43, 0.09), rgba(168, 127, 43, 0.04));
+  box-shadow:
+    inset 0 0 0 1px rgba(168, 127, 43, 0.22),
+    0 10px 24px -14px rgba(168, 127, 43, 0.55);
+}
+.seat--away {
+  opacity: 0.45;
+}
+.seat__head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+}
+.seat__name {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  font-weight: 650;
+  font-size: 0.8rem;
+  letter-spacing: 0.005em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.seat--turn .seat__name {
+  color: #7d5d1b;
+}
+.seat__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.seat__score {
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+/*
+ * The hand and whatever its owner is holding, and which way the one hangs off
+ * the other. Your own drawn card goes below your hand, so your cards sit above
+ * the card you have temporarily grabbed. Everyone else's goes beside theirs,
+ * towards the middle of the felt: that is where a card you have just picked up
+ * would land on a real table, and it is the one direction in which a seat can
+ * grow without running into its neighbour or the piles.
+ */
+.seat__play {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+.seat--right .seat__play {
+  flex-direction: row-reverse;
+}
+.seat--you .seat__play {
+  flex-direction: column;
+  align-items: center;
+}
+
+/*
+ * Hands are two to a row rather than one long line, which is how they sit on a
+ * table and what makes "the bottom two" a position a player can point at. A
+ * hand that grows past four simply spills onto a third row.
+ */
+.seat__cards {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: calc(var(--card-w) * 0.22);
+  justify-content: center;
+  /* So a card being turned over turns, rather than merely narrowing. */
+  perspective: 1200px;
+}
+.seat__empty {
+  color: var(--faint);
+  font-size: 0.74rem;
+  font-style: italic;
+  padding: 0.7rem 0.3rem;
+}
+
+/*
+ * The card a player has picked up, set down beside their hand with a hairline
+ * between the two - the hand they hold and the card they have not decided
+ * about yet are different things, and the line is what says so.
+ */
+.seat__held {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid rgba(168, 127, 43, 0.35);
+  perspective: 1200px;
+  animation: held-in 320ms var(--ease-back);
+}
+.seat--right .seat__held {
+  padding-left: 0;
+  padding-right: 0.5rem;
+  border-left: none;
+  border-right: 1px solid rgba(168, 127, 43, 0.35);
+}
+.seat--you .seat__held {
+  padding-left: 0;
+  padding-top: 0.45rem;
+  border-left: none;
+  border-top: 1px solid rgba(168, 127, 43, 0.35);
+}
+.seat__held .card {
+  --ring: rgba(168, 127, 43, 0.75);
+}
+/* Drawn from the deck, or taken off the discard - the two are not the same. */
+.seat__heldTag {
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #8a6720;
+}
+@keyframes held-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.86);
+  }
+}
+
+/* --------------------------------------------------------------- the log */
+
+.tablelog {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 13rem;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--faint);
+  pointer-events: none;
+}
+.tablelog__line {
+  opacity: 0.5;
+  transition: opacity 400ms var(--ease-io);
+}
+.tablelog__line--latest {
+  opacity: 1;
+  color: var(--ink);
+  font-weight: 550;
+  animation: log-in 300ms var(--ease-out);
+}
+@keyframes log-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+/* ---------------------------------------------------------- turn controls */
+
+.table__controls {
+  margin-top: auto;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 0.9rem;
+}
+.table__buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.snapbar {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex: 0 1 auto;
+}
+/*
+ * The snap button. The one place on the table where milliseconds decide
+ * something, so it is the one thing on the table that is loud.
+ */
+.snapbar__button {
+  position: relative;
+  font: 750 0.92rem/1 var(--sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--red);
+  border: 1px solid var(--red);
+  border-radius: var(--r);
+  padding: 0.8rem 1.5rem;
+  cursor: pointer;
+  min-width: 8rem;
+  box-shadow: 0 1px 2px rgba(22, 24, 29, 0.1), 0 8px 18px -10px rgba(192, 53, 47, 0.8);
+  transition:
+    background 140ms var(--ease-io),
+    border-color 140ms var(--ease-io),
+    transform 120ms var(--ease-out),
+    box-shadow 160ms var(--ease-out);
+}
+.snapbar__button:hover:not(:disabled) {
+  background: #cf3b34;
+  transform: translateY(-1px);
+}
+.snapbar__button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(22, 24, 29, 0.1);
+}
+.snapbar__button:disabled {
+  background: var(--paper);
+  border-color: var(--line-strong);
+  color: var(--faint);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.snapbar__button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+/*
+ * Armed: the gesture has been made and the table is waiting for the card.
+ * Arming leaves the pointer sitting on the button, so these have to outrank
+ * its hover state or the colour would never change.
+ */
+.snapbar--armed .snapbar__button:not(:disabled) {
+  background: var(--brass);
+  border-color: var(--brass);
+  animation: armed 1.15s var(--ease-io) infinite;
+}
+.snapbar--armed .snapbar__button:not(:disabled):hover {
+  background: #b98f35;
+}
+@keyframes armed {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 127, 43, 0.45);
+  }
+  60% {
+    box-shadow: 0 0 0 10px rgba(168, 127, 43, 0);
+  }
+}
+.snapbar--pending .snapbar__button:not(:disabled),
+.snapbar--pending .snapbar__button:not(:disabled):hover {
+  background: var(--green);
+  border-color: var(--green);
+  animation: none;
+}
+.snapbar__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-width: 22rem;
+}
+
+/* ------------------------------------------------------- the quiet screens */
+
+/*
+ * Everything that is not the table - joining, waiting, scoring - is one narrow
+ * column of paper in the middle of the window. Same width, same rhythm, so
+ * moving between them feels like turning a page rather than changing app.
+ */
 .home,
 .lobby,
 .over {
   width: 100%;
-  max-width: 460px;
-  margin: 0 auto;
-  padding-block: clamp(1.5rem, 6vh, 3.5rem);
-  padding-inline: 16px;
+  max-width: 27rem;
+  /*
+   * Centred in the window, horizontally and vertically. Auto margins in a flex
+   * column only take up space that is going spare, so a tall lobby still
+   * starts at the top and scrolls rather than losing its head off the screen.
+   */
+  margin: auto;
+  padding-block: clamp(1.75rem, 7vh, 4rem);
+  padding-inline: 20px;
+  animation: page-in 420ms var(--ease-out);
 }
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 .home__title {
-  font-size: clamp(2.2rem, 9vw, 3rem);
+  font-size: clamp(2.6rem, 11vw, 3.6rem);
   margin: 0;
-  letter-spacing: -0.02em;
+  line-height: 1;
 }
 .home__tagline {
   color: var(--muted);
-  margin-top: 0.4rem;
+  margin: 0.85rem 0 0;
+  max-width: 24rem;
+}
+.home__rule {
+  height: 1px;
+  background: var(--line);
+  margin: 1.6rem 0 0;
+  border: 0;
 }
 .home__form {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
-  margin-top: 1.8rem;
+  gap: 1.15rem;
+  margin-top: 1.6rem;
 }
 .home__actions .button {
   width: 100%;
@@ -282,9 +1212,12 @@ kbd {
 .home__divider {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  color: var(--muted);
-  font-size: 0.82rem;
+  gap: 0.85rem;
+  color: var(--faint);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 .home__divider::before,
 .home__divider::after {
@@ -303,163 +1236,269 @@ kbd {
   flex: 1 1 10rem;
 }
 
+/*
+ * Three cards fanned out above the title: the only decoration in the whole
+ * interface, and it is the thing the game is made of. They wear the default
+ * back, and they lift a little when the page settles.
+ */
+.fan {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-end;
+  height: 104px;
+  margin-bottom: 1.5rem;
+  perspective: 900px;
+}
+.fan span {
+  display: block;
+  width: 68px;
+  height: 96px;
+  border-radius: 5px;
+  background-color: #e9ebef;
+  background-image: var(--card-back, none);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(22, 24, 29, 0.12);
+  box-shadow: var(--card-shadow);
+  transform-origin: 50% 120%;
+  animation: fan-in 700ms var(--ease-back) both;
+}
+.fan span:nth-child(1) {
+  transform: rotate(-13deg);
+  animation-delay: 60ms;
+}
+.fan span:nth-child(2) {
+  margin-left: -26px;
+  transform: rotate(0deg) translateY(-6px);
+  animation-delay: 140ms;
+}
+.fan span:nth-child(3) {
+  margin-left: -26px;
+  transform: rotate(13deg);
+  animation-delay: 220ms;
+}
+@keyframes fan-in {
+  from {
+    opacity: 0;
+    transform: rotate(0deg) translateY(16px) scale(0.9);
+  }
+}
+
 /* ------------------------------------------------------------------ lobby */
 
 .lobby__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
 }
 .lobby__title {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 2rem;
+  line-height: 1.1;
 }
+/* The code is the whole point of this screen, so it is set like a headline. */
 .code {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.1rem;
-  background: rgba(0, 0, 0, 0.32);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.5rem 0.85rem;
+  gap: 0.15rem;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 0.5rem 0.8rem;
   cursor: pointer;
   color: inherit;
   font: inherit;
+  box-shadow: var(--e1);
+  transition:
+    border-color 140ms var(--ease-io),
+    box-shadow 160ms var(--ease-out),
+    transform 140ms var(--ease-out);
+}
+.code:hover {
+  border-color: rgba(22, 24, 29, 0.3);
+  box-shadow: var(--e2);
+  transform: translateY(-1px);
 }
 .code__value {
-  font: 700 1.5rem/1 ui-monospace, monospace;
-  letter-spacing: 0.18em;
+  font: 600 1.45rem/1 var(--mono);
+  letter-spacing: 0.2em;
+  color: var(--ink);
+  /* The tracking on the last glyph would otherwise push the block off centre. */
+  text-indent: 0.2em;
 }
 .code__hint {
-  font-size: 0.7rem;
+  font-size: 0.6rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+  transition: color 160ms var(--ease-io);
+}
+.code:hover .code__hint {
   color: var(--muted);
 }
+
 .lobby__blurb {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  margin: 0.9rem 0 0;
 }
+
+/* A seating list, not a stack of boxes: names on hairlines. */
 .lobby__players {
   list-style: none;
-  margin: 1.2rem 0;
+  margin: 1.5rem 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  border-top: 1px solid var(--line);
 }
 .lobby__player {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  background: rgba(0, 0, 0, 0.26);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.65rem 0.9rem;
+  padding: 0.7rem 0.1rem;
+  border-bottom: 1px solid var(--line);
+  animation: row-in 320ms var(--ease-out);
+}
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 .lobby__playerName {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-weight: 600;
+  font-weight: 550;
+  color: var(--ink);
 }
-.decks {
+
+.setting {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.8rem;
   flex-wrap: wrap;
-  background: rgba(0, 0, 0, 0.26);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.65rem 0.9rem;
-  margin-bottom: 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--line);
 }
-.decks__label {
+.setting__label {
+  font-size: 0.7rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  flex: 0 0 4.5rem;
 }
-.decks__choices {
-  display: flex;
-  gap: 0.3rem;
-}
-.decks__choice {
-  min-width: 2.2rem;
-  padding: 0.3rem 0.1rem;
-  border-radius: 7px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--muted);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-/* Everyone sees the table's setting; only the host can move it. */
-.decks__choice:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-.decks__choice--on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #1a1400;
-}
-.decks__hint {
+.setting__hint {
   margin: 0 0 0 auto;
   font-size: 0.78rem;
   color: var(--muted);
+  text-align: right;
+}
+
+/* A segmented control: one choice, three stops, no borders between them. */
+.decks__choices {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--sunk);
+  border-radius: 10px;
+}
+.decks__choice {
+  min-width: 2.3rem;
+  padding: 0.3rem 0.5rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background 160ms var(--ease-io),
+    color 160ms var(--ease-io),
+    box-shadow 180ms var(--ease-out);
+}
+.decks__choice:not(:disabled):hover {
+  color: var(--ink);
+}
+/* Everyone sees the table setting; only the host can move it. */
+.decks__choice:disabled {
+  cursor: default;
+}
+.decks__choice--on {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--e1);
 }
 
 .backs {
-  background: rgba(0, 0, 0, 0.26);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.65rem 0.9rem;
-  margin-bottom: 1rem;
-}
-.backs__label {
-  font-weight: 600;
+  padding: 0.95rem 0 1.1rem;
+  border-bottom: 1px solid var(--line);
 }
 .backs__choices {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
-  margin-top: 0.55rem;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.45rem;
+  margin-top: 0.6rem;
 }
 .backs__choice {
+  position: relative;
   aspect-ratio: 5 / 7;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background-color: #16307c;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background-color: #e9ebef;
   background-size: cover;
   background-position: center;
   cursor: pointer;
-  /*
-   * The art carries its own pale border, so the ring that marks the choice is
-   * held off the card and sits on the dark panel instead - otherwise it is
-   * invisible against the gold and yellow backs.
-   */
-  outline: 3px solid transparent;
-  outline-offset: 3px;
-  transition: outline-color 120ms ease, transform 120ms ease;
+  box-shadow: var(--e1);
+  transition:
+    transform 160ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
 }
 .backs__choice:disabled {
   cursor: default;
 }
 .backs__choice:not(:disabled):hover {
   transform: translateY(-3px);
+  box-shadow: var(--e2);
 }
+/*
+ * The art carries its own pale border, so the mark for the chosen back is held
+ * off the card and drawn around it - a ring printed on the artwork would be
+ * invisible against the gold and yellow backs.
+ */
 .backs__choice--on {
-  outline-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.backs__choice--on::after {
+  content: "";
+  position: absolute;
+  inset: auto -4px -4px auto;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--ink) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.2 2.2 4.8-4.8' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px no-repeat;
+  animation: pop 240ms var(--ease-back);
+}
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
 }
 
 .lobby__actions {
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
+  margin-top: 1.5rem;
 }
 .lobby__actions .button--primary {
   flex: 1 1 12rem;
@@ -467,520 +1506,92 @@ kbd {
 .lobby__waiting {
   flex: 1 1 12rem;
   color: var(--muted);
+  font-size: 0.9rem;
   margin: 0;
   align-self: center;
-}
-
-/* ------------------------------------------------------------------ table */
-
-/*
- * The table is seen from above: one felt in the middle, the piles at its
- * centre, and a seat for every player spaced evenly round the rim. You are
- * always at the bottom, and the rest keep their order in the player list, so
- * four players make a square, five a pentagon, six a hexagon - the geometry is
- * computed in `seating.ts` and arrives as a left/top percentage per seat.
- *
- * Cards stay the right way up at every seat. A genuinely rotated hand is how a
- * real table looks, but a name and a rank read upside down from the far side
- * of it are no use to anyone, and the ring itself already says who sits where.
- */
-/*
- * One number sets the scale of everything on the felt. It follows whichever
- * of the two viewport dimensions is the tighter, because the ring needs both:
- * a short window runs the far seat into the piles just as surely as a narrow
- * one runs the side seats into them.
- */
-.table {
-  --card-w: clamp(28px, min(3.9vw, 5.6vh), 50px);
-  --card-h: calc(var(--card-w) * 1.42);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding-block: 0.75rem 1rem;
-  padding-inline: 16px;
-  max-width: 1180px;
-  margin: 0 auto;
-  width: 100%;
-}
-/* A fuller table gets smaller cards, so the ring stays the same ring. */
-.table[data-players="5"],
-.table[data-players="6"] {
-  --card-w: clamp(26px, min(3.3vw, 4.8vh), 44px);
-}
-.table__bar {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 0.65rem;
-}
-.table__code {
-  font: 700 0.95rem/1 ui-monospace, monospace;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-}
-.table__status {
-  flex: 1 1 14rem;
-  font-weight: 600;
-}
-.table__right {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-.clock {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--muted);
-}
-.clock--urgent {
-  color: var(--bad);
-}
-
-/* --------------------------------------------------------------- the felt */
-
-.felt {
-  position: relative;
-  flex: 1;
-  width: 100%;
-  /*
-   * Seats are placed as a percentage of this box, so it takes every row of
-   * height going: the vertical axis is the tight one, with the far seat, the
-   * piles and your own seat all having to clear each other on it.
-   */
-  min-height: 24rem;
-  margin: 0 auto;
-}
-.felt__surface {
-  position: absolute;
-  inset: 7% 5%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 38%, #15764a 0%, #0e5533 55%, #0a3f26 100%);
-  border: 3px solid rgba(0, 0, 0, 0.35);
-  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45), 0 10px 30px rgba(0, 0, 0, 0.35);
-}
-.felt__middle {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.piles {
-  display: flex;
-  gap: 1.1rem;
-}
-.pile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-}
-.pile__label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--muted);
-  white-space: nowrap;
-}
-/* A pile that has just been drawn from or added to, so the movement is seen. */
-.pile--moved .card {
-  animation: pile-moved 700ms ease-out;
-}
-@keyframes pile-moved {
-  0% {
-    transform: translateY(-10px) scale(1.07);
-    box-shadow: 0 0 0 3px var(--accent), var(--shadow);
-  }
-  100% {
-    transform: none;
-    box-shadow: 0 0 0 0 transparent, var(--shadow);
-  }
-}
-
-/* -------------------------------------------------------------- the seats */
-
-.seat {
-  position: absolute;
-  /*
-   * Seats are centred on their point on the ring, except at the very top and
-   * bottom, where they are tucked back towards the middle so a tall seat
-   * cannot push past the edge of the felt and into the controls.
-   */
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.5rem 0.45rem;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  background: rgba(0, 0, 0, 0.32);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-/*
- * The seats on the vertical axis are tucked back off their point on the ring,
- * away from the piles in the middle and away from the edge of the table. They
- * are the only two that have anything to clear.
- */
-.seat--bottom {
-  transform: translate(-50%, -65%);
-}
-.seat--top {
-  transform: translate(-50%, -40%);
-}
-.seat--you {
-  background: rgba(0, 0, 0, 0.46);
-  border-color: var(--line);
-}
-.seat--turn {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 22px rgba(255, 197, 61, 0.28);
-}
-.seat--away {
-  opacity: 0.55;
-}
-.seat__head {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  max-width: 100%;
-}
-.seat__name {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-weight: 700;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-.seat__meta {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-.seat__badge,
-.seat__away,
-.seat__called {
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 700;
-  padding: 0.1rem 0.35rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--muted);
-}
-.seat__badge--host {
-  background: rgba(255, 197, 61, 0.22);
-  color: var(--accent);
-}
-.seat__called {
-  background: var(--bad);
-  color: #fff;
-}
-.seat__score {
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-/*
- * The hand and whatever its owner is holding, and which way the one hangs off
- * the other. Your own drawn card goes below your hand, so your cards sit above
- * the card you have temporarily grabbed. Everyone else's goes beside theirs,
- * towards the middle of the felt: that is where a card you have just picked up
- * would land on a real table, and it is the one direction in which a seat can
- * grow without running into its neighbour or the piles.
- */
-.seat__play {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0.35rem;
-}
-.seat--right .seat__play {
-  flex-direction: row-reverse;
-}
-.seat--you .seat__play {
-  flex-direction: column;
-  align-items: center;
-}
-
-/*
- * Hands are two to a row rather than one long line, which is how they sit on a
- * table and what makes "the bottom two" a position a player can point at. A
- * hand that grows past four simply spills onto a third row.
- */
-.seat__cards {
-  display: grid;
-  grid-template-columns: repeat(2, max-content);
-  gap: 0.3rem;
-  justify-content: center;
-  /* So a card being looked at tips up rather than merely narrowing. */
-  perspective: 700px;
-}
-.seat__empty {
-  color: var(--muted);
-  font-size: 0.8rem;
-  padding: 0.6rem 0;
-}
-
-/*
- * The card a player has picked up, set down beside their hand with a dashed
- * line between the two - the hand they hold and the card they have not decided
- * about yet are different things, and the line is what says so.
- */
-.seat__held {
-  padding-left: 0.4rem;
-  border-left: 1px dashed rgba(255, 197, 61, 0.45);
-  animation: held-in 260ms ease-out;
-}
-.seat--right .seat__held {
-  padding-left: 0;
-  padding-right: 0.4rem;
-  border-left: none;
-  border-right: 1px dashed rgba(255, 197, 61, 0.45);
-}
-.seat--you .seat__held {
-  padding-left: 0;
-  padding-top: 0.35rem;
-  border-left: none;
-  border-top: 1px dashed rgba(255, 197, 61, 0.45);
-}
-.seat__held .card {
-  box-shadow: 0 0 0 2px var(--accent), var(--shadow);
-}
-@keyframes held-in {
-  from {
-    opacity: 0;
-    transform: translateY(-12px) scale(0.85);
-  }
-}
-.seat--holding {
-  border-color: rgba(255, 197, 61, 0.5);
-}
-
-/* ------------------------------------------------------ what just happened */
-
-/*
- * Every move animates on every screen at the same moment. Cambio is played
- * face down, so this is what keeps it readable: you cannot see what the card
- * is, but you can see it being turned over, traded or snapped, exactly as you
- * would across a real table.
- */
-/*
- * A ring for as long as the move is live, so a player who glances over a beat
- * late still sees which card it was, and the motion on top of it for anyone
- * watching when it lands. The colour is the move: gold for a look, blue for a
- * trade, green for a card arriving, red for a snap or a penalty.
- */
-.card--did-peek,
-.card--did-swap,
-.card--did-replace,
-.card--did-give,
-.card--did-penalty,
-.card--did-snap {
-  z-index: 2;
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.card--did-swap {
-  outline-color: #7cc5ff;
-}
-.card--did-replace,
-.card--did-give {
-  outline-color: var(--good);
-}
-.card--did-penalty,
-.card--did-snap {
-  outline-color: var(--bad);
-}
-
-.card--did-peek {
-  animation: did-peek 900ms ease-in-out;
-}
-@keyframes did-peek {
-  0%,
-  100% {
-    transform: none;
-  }
-  30%,
-  60% {
-    transform: translateY(-8px) rotateY(58deg);
-    box-shadow: 0 14px 20px rgba(0, 0, 0, 0.45);
-  }
-}
-.card--did-swap {
-  animation: did-swap 900ms ease-in-out;
-}
-@keyframes did-swap {
-  0%,
-  100% {
-    transform: none;
-  }
-  25% {
-    transform: translateY(-14px) rotate(-7deg);
-    box-shadow: 0 14px 20px rgba(0, 0, 0, 0.45);
-  }
-  65% {
-    transform: translateY(-6px) rotate(5deg);
-    box-shadow: 0 10px 16px rgba(0, 0, 0, 0.4);
-  }
-}
-.card--did-replace,
-.card--did-give {
-  animation: did-land 800ms ease-out;
-}
-@keyframes did-land {
-  0% {
-    transform: translateY(-20px) scale(1.14);
-    box-shadow: 0 16px 24px rgba(0, 0, 0, 0.5);
-  }
-  100% {
-    transform: none;
-  }
-}
-.card--did-penalty,
-.card--did-snap {
-  animation: did-snap 800ms ease-out;
-}
-@keyframes did-snap {
-  0%,
-  100% {
-    transform: none;
-  }
-  15%,
-  45% {
-    transform: translateX(-4px) scale(1.08);
-  }
-  30%,
-  60% {
-    transform: translateX(4px) scale(1.08);
-  }
-}
-
-/* --------------------------------------------------------------- the log */
-
-.tablelog {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  max-width: 14rem;
-  font-size: 0.75rem;
-  line-height: 1.35;
-  color: var(--muted);
-  pointer-events: none;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-}
-.tablelog__line {
-  opacity: 0.4;
-}
-.tablelog__line--latest {
-  opacity: 1;
-  color: var(--text);
-  font-weight: 600;
-}
-
-/* ---------------------------------------------------------- turn controls */
-
-.table__controls {
-  margin-top: auto;
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  flex-wrap: wrap;
-  border-top: 1px solid var(--line);
-  padding-top: 0.85rem;
-}
-.table__buttons {
-  display: flex;
-  gap: 0.55rem;
-  flex-wrap: wrap;
-}
-
-.snapbar {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  flex: 1 1 18rem;
-}
-.snapbar__button {
-  font: 800 1.05rem/1 inherit;
-  letter-spacing: 0.08em;
-  color: #fff;
-  background: var(--bad);
-  border: 2px solid transparent;
-  border-radius: var(--radius);
-  padding: 0.75rem 1.4rem;
-  cursor: pointer;
-  min-width: 7.5rem;
-}
-.snapbar__button:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-.snapbar--armed .snapbar__button {
-  background: var(--accent);
-  color: #3d2c00;
-  border-color: #fff;
-}
-.snapbar--pending .snapbar__button {
-  background: var(--good);
-}
-.snapbar__hint {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--muted);
 }
 
 /* -------------------------------------------------------------- game over */
 
 .over__title {
-  font-size: clamp(1.7rem, 7vw, 2.3rem);
-  margin: 0 0 1.2rem;
+  font-size: clamp(1.9rem, 8vw, 2.6rem);
+  margin: 0 0 0.3rem;
+  line-height: 1.1;
+}
+.over__sub {
+  margin: 0 0 1.6rem;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 .over__scores {
   list-style: none;
-  margin: 0 0 1.5rem;
+  margin: 0 0 1.8rem;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  border-top: 1px solid var(--line);
 }
 .over__row {
   display: grid;
-  grid-template-columns: 1.5rem 1fr auto auto;
-  gap: 0.75rem;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.26);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.6rem 0.85rem;
+  grid-template-columns: 1.4rem 1fr auto;
+  gap: 0.8rem;
+  align-items: baseline;
+  padding: 0.75rem 0.1rem;
+  border-bottom: 1px solid var(--line);
+  animation: row-in 400ms var(--ease-out) both;
+}
+.over__row:nth-child(1) {
+  animation-delay: 60ms;
+}
+.over__row:nth-child(2) {
+  animation-delay: 130ms;
+}
+.over__row:nth-child(3) {
+  animation-delay: 200ms;
+}
+.over__row:nth-child(4) {
+  animation-delay: 270ms;
+}
+.over__row:nth-child(5) {
+  animation-delay: 340ms;
+}
+.over__row:nth-child(6) {
+  animation-delay: 410ms;
 }
 .over__row--win {
-  border-color: var(--accent);
+  background: linear-gradient(90deg, var(--brass-soft), rgba(168, 127, 43, 0));
+  box-shadow: inset 2px 0 0 var(--brass);
+  padding-left: 0.7rem;
+  margin-left: -0.7rem;
 }
 .over__rank {
-  color: var(--muted);
+  font-family: var(--serif);
+  color: var(--faint);
   font-variant-numeric: tabular-nums;
+}
+.over__row--win .over__rank {
+  color: #8a6720;
 }
 .over__name {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-weight: 600;
+  gap: 0.45rem;
+  font-weight: 550;
+  color: var(--ink);
+  flex-wrap: wrap;
 }
 .over__cards {
-  font: 0.8rem/1 ui-monospace, monospace;
-  color: var(--muted);
+  display: block;
+  font: 0.72rem/1.4 var(--mono);
+  color: var(--faint);
+  letter-spacing: 0.08em;
+  margin-top: 0.15rem;
+  flex-basis: 100%;
 }
 .over__score {
-  font-weight: 800;
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  color: var(--ink);
   min-width: 2ch;
   text-align: right;
 }
@@ -998,52 +1609,94 @@ kbd {
   flex: 1 1 12rem;
   margin: 0;
   color: var(--muted);
+  font-size: 0.9rem;
 }
 
 /* ----------------------------------------------------------------- toasts */
 
 .toasts {
   position: fixed;
-  bottom: 1rem;
+  bottom: 1.1rem;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column-reverse;
-  gap: 0.4rem;
+  gap: 0.45rem;
   pointer-events: none;
   z-index: 10;
   width: max-content;
   max-width: calc(100vw - 32px);
 }
 .toast {
-  background: rgba(0, 0, 0, 0.82);
+  background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.55rem 1rem;
-  font-weight: 600;
-  font-size: 0.9rem;
-  box-shadow: var(--shadow);
+  border-radius: 999px;
+  padding: 0.55rem 1.05rem;
+  font-weight: 550;
+  font-size: 0.86rem;
+  color: var(--ink);
+  box-shadow: var(--e3);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: toast-in 320ms var(--ease-back);
 }
-.toast--good {
-  border-color: var(--good);
+/* A dot carries the verdict, so the text can stay the same colour as the page. */
+.toast::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--faint);
+  flex: none;
 }
-.toast--bad {
-  border-color: var(--bad);
+.toast--good::before {
+  background: var(--green);
+}
+.toast--bad::before {
+  background: var(--red);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
 }
 
+/* ------------------------------------------------------------- the window */
+
 /*
- * In a short window the piles move up off your own seat, which is the tallest
- * at the table once you are holding a card, and it tucks further back from the
- * edge. The ring holds its shape all the way down: a phone-sized table is
- * small but still a table, so who-sits-where is the same thing to learn on
- * every screen.
+ * A short window is the hard case, because the vertical axis has to carry
+ * three things that cannot overlap: the far seat, the piles, and your own
+ * seat, which is the tallest at the table once you are holding a card. Below
+ * this height they no longer all fit at full size, so the cards come down
+ * first - shrinking them buys room on every one of the three at once, where
+ * shuffling the three about only ever robs one to pay another. The two seats
+ * on the axis then tuck away from the middle, and the piles sit a little
+ * above centre, where the slack is.
+ *
+ * The ring holds its shape all the way down: a phone-sized table is small but
+ * still a table, so who-sits-where is the same thing to learn on every screen.
  */
-@media (max-height: 720px) {
+@media (max-height: 760px) {
+  .table {
+    --card-w: clamp(24px, min(3.6vw, 4.8vh), 44px);
+  }
+  .table[data-players="5"],
+  .table[data-players="6"] {
+    --card-w: clamp(22px, min(3.1vw, 4.2vh), 40px);
+  }
+  .felt {
+    min-height: 20rem;
+  }
   .felt__middle {
-    top: 42%;
+    top: 46%;
+  }
+  .seat--top {
+    transform: translate(-50%, -34%);
   }
   .seat--bottom {
-    transform: translate(-50%, -72%);
+    transform: translate(-50%, -68%);
   }
 }
 @media (max-width: 900px) {
@@ -1053,32 +1706,53 @@ kbd {
 }
 @media (max-width: 640px) {
   .table {
-    padding-inline: 10px;
+    padding-inline: 12px;
   }
   .felt {
     min-height: 18rem;
   }
   .seat {
-    padding: 0.25rem 0.3rem 0.3rem;
-    gap: 0.2rem;
+    padding: 0.28rem 0.32rem 0.34rem;
+    gap: 0.3rem;
   }
   .seat__name {
     font-size: 0.72rem;
   }
-  .seat__cards {
-    gap: 0.2rem;
-  }
   .piles {
-    gap: 0.6rem;
-  }
-  .pile__label {
-    font-size: 0.6rem;
+    gap: calc(var(--card-w) * 0.38);
   }
   /* At this width the log would land on top of the nearest seat. */
   .tablelog {
     display: none;
   }
   .snapbar {
-    flex-basis: 100%;
+    flex: 1 1 100%;
+  }
+  .table__buttons {
+    margin-left: 0;
+  }
+  .backs__choices {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* -------------------------------------------------------------- stillness */
+
+/*
+ * Every animation here is either a move being reported or a surface settling,
+ * and all of it is decoration to someone who has asked for less of it. The
+ * rings, the plates and the text stay; only the movement goes.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+  .card__inner,
+  .card--down > .card__inner {
+    transition: none;
   }
 }

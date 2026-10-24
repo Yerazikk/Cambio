@@ -49,26 +49,34 @@ export function Seat({
   if (!player.connected) classes.push("seat--away");
   if (holding) classes.push("seat--holding");
 
+  /*
+   * What the seat needs in order to be dealt to: its place in the deal order,
+   * and the direction the middle of the table lies in, so its cards arrive
+   * from the piles rather than from nowhere in particular.
+   */
+  const style = {
+    left: `${placement.x}%`,
+    top: `${placement.y}%`,
+    "--seat-order": placement.turnOffset,
+    "--deal-x": `${placement.inX * 46}px`,
+    "--deal-y": `${placement.inY * 46}px`,
+  } as React.CSSProperties;
+
   return (
-    <section
-      className={classes.join(" ")}
-      style={{ left: `${placement.x}%`, top: `${placement.y}%` }}
-      data-testid={`seat-${player.name}`}
-      aria-label={`${player.name}'s hand`}
-    >
+    <section className={classes.join(" ")} style={style} data-testid={`seat-${player.name}`} aria-label={`${player.name}'s hand`}>
       <header className="seat__head">
         <span className="seat__name">
           {player.name}
-          {isYou && <span className="seat__badge">you</span>}
-          {player.isHost && <span className="seat__badge seat__badge--host">host</span>}
+          {isYou && <span className="chip chip--quiet">you</span>}
+          {player.isHost && <span className="chip chip--brass">host</span>}
         </span>
         <span className="seat__meta">
           {!player.connected && (
-            <span className="seat__away" data-testid={`away-${player.name}`}>
+            <span className="chip chip--quiet" data-testid={`away-${player.name}`}>
               away
             </span>
           )}
-          {player.calledCambio && <span className="seat__called">Cambio!</span>}
+          {player.calledCambio && <span className="chip chip--red">Cambio</span>}
           {player.score !== null && (
             <span className="seat__score" data-testid={`score-${player.name}`}>
               {player.score}
@@ -91,6 +99,7 @@ export function Seat({
                 flash={flashFor(player.id, index)}
                 onClick={() => onSlot(index)}
                 testId={`slot-${player.name}-${index}`}
+                dealIndex={index}
                 {...(isYou ? { label: String(index + 1) } : {})}
               />
             );
@@ -104,7 +113,8 @@ export function Seat({
         */}
         {holding && (
           <div className="seat__held" data-testid={isYou ? "held-card" : `held-${player.name}`}>
-            <CardFace card={heldCard} label={heldFromDiscard ? "taken" : "drawn"} />
+            <CardFace card={heldCard} />
+            <span className="seat__heldTag">{heldFromDiscard ? "taken" : "drawn"}</span>
           </div>
         )}
       </div>

@@ -54,9 +54,9 @@ export function Lobby({ view, me, onKick, onDecks, onBack, onStart, onLeave }: L
           <li key={player.id} className="lobby__player" data-testid={`lobby-player-${player.name}`}>
             <span className="lobby__playerName">
               {player.name}
-              {player.id === me && <span className="seat__badge">you</span>}
-              {player.isHost && <span className="seat__badge seat__badge--host">host</span>}
-              {!player.connected && <span className="seat__away">away</span>}
+              {player.id === me && <span className="chip chip--quiet">you</span>}
+              {player.isHost && <span className="chip chip--brass">host</span>}
+              {!player.connected && <span className="chip chip--quiet">away</span>}
             </span>
             {amHost && player.id !== me && (
               <button
@@ -72,8 +72,8 @@ export function Lobby({ view, me, onKick, onDecks, onBack, onStart, onLeave }: L
         ))}
       </ul>
 
-      <section className="decks" aria-label="Decks in play">
-        <span className="decks__label">Decks</span>
+      <section className="setting" aria-label="Decks in play">
+        <span className="setting__label">Decks</span>
         <div className="decks__choices" role="group">
           {DECK_CHOICES.map((count) => {
             const chosen = view.decks === count;
@@ -92,13 +92,13 @@ export function Lobby({ view, me, onKick, onDecks, onBack, onStart, onLeave }: L
             );
           })}
         </div>
-        <p className="decks__hint" data-testid="decks-hint">
+        <p className="setting__hint" data-testid="decks-hint">
           {view.decks * CARDS_PER_DECK} cards{view.decks > 1 ? " - matches come up far more often" : ""}
         </p>
       </section>
 
       <section className="backs" aria-label="Card back">
-        <span className="backs__label">Cards</span>
+        <span className="setting__label">Cards</span>
         <div className="backs__choices" role="group">
           {CARD_BACKS.map((back) => {
             const chosen = view.back === back.id;

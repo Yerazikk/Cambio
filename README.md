@@ -61,6 +61,27 @@ drawn card sits beside theirs, out towards the middle of the felt. That is both
 where you would put a card down at a real table and the one direction a seat
 can grow without crowding its neighbour.
 
+### How it is drawn
+
+The table is white: paper for the surface, ink for everything you read, and a
+hairline wherever a lesser screen would put a box. The only coloured things on
+it are the cards, and the four marks that mean something - brass for whose turn
+it is, green for a card you have chosen, blue for a trade, red for a snap.
+
+A card is an object with two sides rather than two pieces of markup. Face up or
+face down is one class on its frame, and inside the frame the two faces sit back
+to back on a plane that turns, so every reveal in the game is the same
+half-second flip: your own study, a seven, a nine played across the table, every
+hand at the final show. The gestures move the frame and the flip turns the plane
+inside it, which is what lets both run at once - the player who plays a seven
+watches their own card lift off the table and turn over in one movement, and
+everyone else watches the same lift with the card staying face down.
+
+A fresh hand is dealt the way it would be dealt: out of the middle, a card at a
+time, round the ring in turn order. It is the clearest statement the screen can
+make about who is playing and in what order, and it is made once, before anyone
+has looked at anything.
+
 ### What everyone can see
 
 Cambio is played face down, which could make it opaque - someone across the

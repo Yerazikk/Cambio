@@ -16,10 +16,22 @@ export function Home({ onCreate, onJoin, disabled }: HomeProps): React.JSX.Eleme
 
   return (
     <main className="home">
+      {/*
+        Three cards, fanned. The only decoration in the whole interface, and it
+        is the thing the game is made of - it also shows the back this table
+        will play with before anyone has to choose one.
+      */}
+      <div className="fan" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+
       <h1 className="home__title">Cambio</h1>
       <p className="home__tagline">
         Lowest hand wins &mdash; if you can remember what you are holding. Snap a match the moment you see it.
       </p>
+      <hr className="home__rule" />
 
       <form
         className="home__form"

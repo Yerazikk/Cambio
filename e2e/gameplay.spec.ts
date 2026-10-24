@@ -42,6 +42,23 @@ test.describe("playing by clicking", () => {
     for (const player of players) await player.close();
   });
 
+  test("discards a drawn card by clicking the discard pile itself", async ({ browser }) => {
+    const { players } = await seatTable(browser, ["Ana", "Bo"]);
+    await startRound(players);
+    const actor = await currentPlayer(players);
+
+    await actor.page.getByTestId("deck").click();
+    await expect(actor.page.getByTestId("held-card")).toBeVisible();
+    const discardBefore = Number(await actor.page.getByTestId("discard-count").innerText());
+
+    await actor.page.getByTestId("discard").click();
+
+    await expect(actor.page.getByTestId("discard-count")).toHaveText(String(discardBefore + 1));
+    await expect(actor.page.getByTestId("held-card")).toHaveCount(0);
+
+    for (const player of players) await player.close();
+  });
+
   test("refuses to let a player act out of turn", async ({ browser }) => {
     const { players } = await seatTable(browser, ["Ana", "Bo"]);
     await startRound(players);

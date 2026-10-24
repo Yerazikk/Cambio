@@ -45,6 +45,8 @@ export type GameStore = {
   reveals: Reveal[];
   /** The last few moves, in the words everyone at the table would use. */
   log: LogLine[];
+  /** Set for as long as a fresh hand is being dealt out to the seats. */
+  dealing: boolean;
   /** While armed, clicking any card snaps it instead of playing it. */
   snapArmed: boolean;
   /** Set the instant a snap is sent, for feedback that does not wait for the server. */
@@ -77,6 +79,11 @@ const TOAST_MS = 3_500;
 const FLASH_MS = 1_100;
 /** How many past moves the table log keeps on screen. */
 const LOG_LINES = 5;
+/**
+ * How long the deal takes to reach every seat. Long enough to cover the last
+ * card of a six-handed table, which goes out last.
+ */
+const DEAL_MS = 1_400;
 
 export function useGame(): GameStore {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
@@ -88,6 +95,7 @@ export function useGame(): GameStore {
   const [flashes, setFlashes] = useState<SlotFlash[]>([]);
   const [piles, setPiles] = useState<PileFlash[]>([]);
   const [log, setLog] = useState<LogLine[]>([]);
+  const [dealing, setDealing] = useState(false);
   const [snapArmed, setSnapArmed] = useState(false);
   const [snapPending, setSnapPending] = useState(false);
   const [pick, setPick] = useState<PickOne>(null);
@@ -153,6 +161,8 @@ export function useGame(): GameStore {
             setFlashes([]);
             setPiles([]);
             setLog([]);
+            // A new hand is on its way out to the seats.
+            setDealing(true);
           }
           phaseRef.current = event.view.phase;
 
@@ -276,6 +286,13 @@ export function useGame(): GameStore {
     return () => clearTimeout(timer);
   }, [piles]);
 
+  /** The deal is over once the last card has reached the last seat. */
+  useEffect(() => {
+    if (!dealing) return;
+    const timer = setTimeout(() => setDealing(false), DEAL_MS);
+    return () => clearTimeout(timer);
+  }, [dealing]);
+
   /** Snap mode disarms itself, so a stray later click does not snap by accident. */
   useEffect(() => {
     if (!snapArmed) return;
@@ -325,6 +342,7 @@ export function useGame(): GameStore {
       toasts,
       reveals,
       log,
+      dealing,
       snapArmed,
       snapPending,
       pick,
@@ -359,6 +377,7 @@ export function useGame(): GameStore {
       toasts,
       reveals,
       log,
+      dealing,
       snapArmed,
       snapPending,
       pick,

@@ -51,6 +51,7 @@ export function App(): React.JSX.Element {
           me={me}
           snapArmed={game.snapArmed}
           snapPending={game.snapPending}
+          dealing={game.dealing}
           pick={game.pick}
           log={game.log}
           act={game.act}

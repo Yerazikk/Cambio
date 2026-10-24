@@ -9,6 +9,14 @@ export type Placement = {
   /** Centre of the seat, in percent of the table box. */
   x: number;
   y: number;
+  /**
+   * The direction the middle of the table lies in from this seat, as a unit
+   * vector. Cards are dealt out of the middle, so this is the line they travel
+   * in - which means the deal comes out of the piles at every seat without a
+   * case per seat.
+   */
+  inX: number;
+  inY: number;
   /** Which side of the table this seat is on, for layout that cannot be angular. */
   side: "bottom" | "left" | "top" | "right";
 };
@@ -48,12 +56,17 @@ export function seatRing(players: PlayerView[], me: PlayerId): Placement[] {
     const cos = Math.cos(radians);
     const sin = Math.sin(radians);
 
+    // Towards the middle is simply back along the radius the seat sits on.
+    const length = Math.hypot(RADIUS_X * cos, RADIUS_Y * sin) || 1;
+
     return {
       player,
       isYou: player.id === me,
       turnOffset,
       x: 50 + RADIUS_X * cos,
       y: 50 + RADIUS_Y * sin,
+      inX: (-RADIUS_X * cos) / length,
+      inY: (-RADIUS_Y * sin) / length,
       side: sideFor(cos, sin),
     };
   });
