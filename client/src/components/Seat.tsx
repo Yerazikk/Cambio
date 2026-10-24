@@ -23,12 +23,16 @@ export type SeatProps = {
  * One player's place at the table: their name plate, their hand, and the card
  * they are holding.
  *
- * The name plate is always on the outside and the hand below it. The card a
- * player has drawn goes where they would actually put it down: below your own
- * hand, so your cards sit above the one you have temporarily picked up, and
- * out towards the middle of the felt for everyone else - which is both where
- * you would see it across a real table and the one part of the table that is
- * always clear, so a seat never grows into its neighbour.
+ * The hand is turned to face whoever is sitting there, the way it would be on
+ * a real table: upright for you at the bottom, sideways at the left and right
+ * seats, upside down across from you. The name plate is not - it stays level
+ * and on the outside, because a name read upside down is no use to anyone and
+ * a plate is signage rather than something lying on the felt.
+ *
+ * Within that turned frame every seat is the same: the hand, and below it -
+ * between the player and their cards - whatever they have just picked up.
+ * Your own drawn card is the exception, and does not appear here at all; it
+ * is held in front of you by the table itself, big enough to read.
  */
 export function Seat({
   placement,
@@ -53,11 +57,19 @@ export function Seat({
    * What the seat needs in order to be dealt to: its place in the deal order,
    * and the direction the middle of the table lies in, so its cards arrive
    * from the piles rather than from nowhere in particular.
+   *
+   * The row count goes out too. A seat's footprint has to be square, so that
+   * turning the hand inside it does not move the name plate, and only this
+   * side knows how many rows a hand of this size takes - a penalty card can
+   * put a fifth on the table at any moment.
    */
   const style = {
     left: `${placement.x}%`,
     top: `${placement.y}%`,
     "--seat-order": placement.turnOffset,
+    "--seat-angle": `${placement.angle}deg`,
+    "--seat-rows": Math.max(1, Math.ceil(player.slots.length / 2)),
+    "--seat-held": holding && !isYou ? 1 : 0,
     "--deal-x": `${placement.inX * 46}px`,
     "--deal-y": `${placement.inY * 46}px`,
   } as React.CSSProperties;
@@ -110,9 +122,10 @@ export function Seat({
         {/*
           Face up only for its owner - or for the whole table when it came off
           the discard pile, which everyone watched go face up on the way out.
+          Your own goes to the table's hand instead, so it can be big.
         */}
-        {holding && (
-          <div className="seat__held" data-testid={isYou ? "held-card" : `held-${player.name}`}>
+        {holding && !isYou && (
+          <div className="seat__held" data-testid={`held-${player.name}`}>
             <CardFace card={heldCard} />
             <span className="seat__heldTag">{heldFromDiscard ? "taken" : "drawn"}</span>
           </div>

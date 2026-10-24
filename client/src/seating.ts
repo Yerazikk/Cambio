@@ -17,16 +17,25 @@ export type Placement = {
    */
   inX: number;
   inY: number;
+  /**
+   * How far this seat's cards are turned, in degrees clockwise, so that they
+   * face the person sitting there. You are at the bottom and read upright, so
+   * yours is 0; it is one step per seat round the ring from there.
+   */
+  angle: number;
   /** Which side of the table this seat is on, for layout that cannot be angular. */
   side: "bottom" | "left" | "top" | "right";
 };
 
 /**
- * How far out from the middle the seats sit. Wider than tall, because screens
- * are: the piles need the space in the centre either way, and an ellipse keeps
- * the left and right seats from crowding them on a laptop.
+ * How far out from the middle the seats sit.
+ *
+ * A seat's footprint is square and turned to face its owner, so it reaches the
+ * same distance out whichever chair it is - which is what sets this: far
+ * enough that the hands clear the piles in the middle, close enough that a
+ * side seat and the card in its player's hand stay inside the rim.
  */
-const RADIUS_X = 39;
+const RADIUS_X = 35;
 const RADIUS_Y = 35;
 
 /**
@@ -67,6 +76,13 @@ export function seatRing(players: PlayerView[], me: PlayerId): Placement[] {
       y: 50 + RADIUS_Y * sin,
       inX: (-RADIUS_X * cos) / length,
       inY: (-RADIUS_Y * sin) / length,
+      /*
+       * A card's top edge points away from its owner, into the table. That
+       * direction is the seat's own step round the ring, so the turn a hand
+       * needs to face its player is just that step - no trigonometry, and no
+       * case per seat.
+       */
+      angle: turnOffset * step,
       side: sideFor(cos, sin),
     };
   });

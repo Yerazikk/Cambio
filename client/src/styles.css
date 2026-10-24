@@ -632,9 +632,11 @@ kbd {
  * four players make a square, five a pentagon, six a hexagon - the geometry is
  * computed in `seating.ts` and arrives as a left/top percentage per seat.
  *
- * Cards stay the right way up at every seat. A genuinely rotated hand is how a
- * real table looks, but a name and a rank read upside down from the far side
- * of it are no use to anyone, and the ring itself already says who sits where.
+ * Every hand is turned to face the person holding it, as it would be if these
+ * people were sitting round a real table: yours upright, the far seat's upside
+ * down, the side seats' on their edge. What stays level is the signage - name,
+ * chips and score - because a plate beside the table is not a card lying on
+ * it, and a name read upside down is no use to anyone.
  */
 /*
  * One number sets the scale of everything on the felt. It follows whichever
@@ -643,8 +645,17 @@ kbd {
  * one runs the side seats into them.
  */
 .table {
-  --card-w: clamp(28px, min(3.9vw, 5.6vh), 52px);
+  --card-base: clamp(28px, min(3.9vw, 5.6vh), 52px);
+  --card-w: var(--card-base);
   --card-h: calc(var(--card-w) * 1.42);
+  /*
+   * How far a card held in a hand leans back off the felt, towards the person
+   * holding it. Negative, so the top edge comes up and forward rather than
+   * falling away - a card someone has picked up is being looked at, not laid
+   * down. It is used inside each seat's own turned frame, so it tips towards
+   * that player and not towards the screen.
+   */
+  --hold-tilt: -24deg;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -658,7 +669,7 @@ kbd {
 /* A fuller table gets smaller cards, so the ring stays the same ring. */
 .table[data-players="5"],
 .table[data-players="6"] {
-  --card-w: clamp(26px, min(3.3vw, 4.8vh), 46px);
+  --card-base: clamp(26px, min(3.3vw, 4.8vh), 46px);
 }
 
 .table__bar {
@@ -872,12 +883,11 @@ kbd {
   flex-direction: column;
   align-items: center;
   gap: 0.42rem;
-  padding: 0.4rem 0.55rem 0.5rem;
-  border-radius: var(--r-lg);
   transition:
     background 220ms var(--ease-io),
     box-shadow 240ms var(--ease-out),
-    opacity 220ms var(--ease-io);
+    opacity 220ms var(--ease-io),
+    transform 300ms var(--ease-out);
 }
 /*
  * The seats on the vertical axis are tucked back off their point on the ring,
@@ -891,11 +901,20 @@ kbd {
   transform: translate(-50%, -40%);
 }
 /*
+ * While you are holding a card your own seat draws back up the table, because
+ * the hand comes up in front of it and the two would otherwise sit on the
+ * same strip of screen. It is also what the movement means: you have picked a
+ * card up off the table, so the table gives you room to look at it.
+ */
+.seat--you.seat--holding {
+  transform: translate(-50%, -94%);
+}
+/*
  * Whose turn it is, said once: a warm plate under the seat and a brass
  * nameplate. Nothing else on the table is brass, so there is never a question
  * about where the game is.
  */
-.seat--turn {
+.seat--turn .seat__cards {
   background: linear-gradient(180deg, rgba(168, 127, 43, 0.09), rgba(168, 127, 43, 0.04));
   box-shadow:
     inset 0 0 0 1px rgba(168, 127, 43, 0.22),
@@ -936,25 +955,34 @@ kbd {
   color: var(--ink);
 }
 /*
- * The hand and whatever its owner is holding, and which way the one hangs off
- * the other. Your own drawn card goes below your hand, so your cards sit above
- * the card you have temporarily grabbed. Everyone else's goes beside theirs,
- * towards the middle of the felt: that is where a card you have just picked up
- * would land on a real table, and it is the one direction in which a seat can
- * grow without running into its neighbour or the piles.
+ * Everything a seat actually has on the felt, turned to face its owner.
+ *
+ * This one rotation is what makes the table a table: inside it a seat has no
+ * sides and no special cases, so "below the hand" means the same thing at
+ * every chair - between the player and their cards, which is where a card you
+ * have just picked up and not yet decided about would sit on a real table.
+ *
+ * The turn is deliberately not animated. A hand that spun when a player
+ * joined would read as the table moving, and the table never moves.
  */
 .seat__play {
   display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0.45rem;
-}
-.seat--right .seat__play {
-  flex-direction: row-reverse;
-}
-.seat--you .seat__play {
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  /*
+   * Square, and big enough to hold the hand standing up. A square is the one
+   * footprint a rotation cannot change, so the name plate above it sits the
+   * same distance from the cards at every seat, and a seat takes the same
+   * room on the felt whichever way round it is facing.
+   */
+  --play-box: calc(var(--card-h) * (var(--seat-rows, 2) + var(--seat-held, 0)) + 0.9rem);
+  width: var(--play-box);
+  height: var(--play-box);
+  transform: rotate(var(--seat-angle, 0deg));
+  /* The lean of a held card is a real tip in space, so it needs depth. */
+  perspective: 900px;
 }
 
 /*
@@ -967,8 +995,13 @@ kbd {
   grid-template-columns: repeat(2, max-content);
   gap: calc(var(--card-w) * 0.22);
   justify-content: center;
+  padding: calc(var(--card-w) * 0.15);
+  border-radius: var(--r-lg);
   /* So a card being turned over turns, rather than merely narrowing. */
   perspective: 1200px;
+  transition:
+    background 220ms var(--ease-io),
+    box-shadow 240ms var(--ease-out);
 }
 .seat__empty {
   color: var(--faint);
@@ -978,34 +1011,31 @@ kbd {
 }
 
 /*
- * The card a player has picked up, set down beside their hand with a hairline
- * between the two - the hand they hold and the card they have not decided
- * about yet are different things, and the line is what says so.
+ * The card a player has picked up. It is the one card on the felt that is not
+ * lying on it: a card in a hand is tipped up off the table towards its owner,
+ * and that lean - plus the shadow it throws back onto the felt - is what
+ * separates the card someone is deciding about from the four they have put
+ * down. The hairline above it says the same thing in two dimensions.
  */
 .seat__held {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
-  padding-left: 0.5rem;
-  border-left: 1px solid rgba(168, 127, 43, 0.35);
-  perspective: 1200px;
-  animation: held-in 320ms var(--ease-back);
-}
-.seat--right .seat__held {
-  padding-left: 0;
-  padding-right: 0.5rem;
-  border-left: none;
-  border-right: 1px solid rgba(168, 127, 43, 0.35);
-}
-.seat--you .seat__held {
-  padding-left: 0;
   padding-top: 0.45rem;
-  border-left: none;
   border-top: 1px solid rgba(168, 127, 43, 0.35);
+  transform-style: preserve-3d;
+  animation: held-in 320ms var(--ease-back);
 }
 .seat__held .card {
   --ring: rgba(168, 127, 43, 0.75);
+  /*
+   * Tipped about its bottom edge, which is the edge resting on the table -
+   * a card leans back off the felt, it does not hover parallel to it.
+   */
+  transform-origin: 50% 100%;
+  transform: rotateX(var(--hold-tilt));
+  box-shadow: 0 calc(var(--card-h) * 0.12) calc(var(--card-h) * 0.16) -4px rgba(22, 24, 29, 0.3);
 }
 /* Drawn from the deck, or taken off the discard - the two are not the same. */
 .seat__heldTag {
@@ -1019,6 +1049,72 @@ kbd {
   from {
     opacity: 0;
     transform: translateY(-14px) scale(0.86);
+  }
+}
+
+/*
+ * Your own hand.
+ *
+ * The card you have drawn is the only one on screen you are actually holding,
+ * and it is the whole of the decision in front of you - so it does not sit on
+ * the felt with the rest. It comes up in front of you at the near edge of the
+ * table, several times the size of a card lying down, tipped back towards
+ * your eye and throwing a shadow onto the table behind it.
+ *
+ * It overlaps the felt on purpose: a card in your hand is between you and the
+ * table, and the seat above pulls back while you hold one so the two never
+ * fight for the same strip of screen.
+ */
+.hand {
+  position: absolute;
+  left: 50%;
+  /*
+   * Hung over the near edge of the table rather than standing on it, which is
+   * where a card in your hand actually is: nearer to you than the felt, and
+   * in front of everything printed on it.
+   */
+  bottom: calc(var(--card-h) * -0.26);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  /* Scaled off the base so a six-player table shrinks the hand with it. */
+  --card-w: calc(var(--card-base) * 1.95);
+  --card-h: calc(var(--card-w) * 1.42);
+  transform: translateX(-50%);
+  perspective: 1000px;
+  pointer-events: none;
+  animation: hand-in 300ms var(--ease-back);
+}
+.hand .card {
+  transform-origin: 50% 100%;
+  transform: rotateX(var(--hold-tilt));
+  box-shadow:
+    0 calc(var(--card-h) * 0.1) calc(var(--card-h) * 0.2) -6px rgba(22, 24, 29, 0.38),
+    0 2px 6px rgba(22, 24, 29, 0.12);
+}
+/*
+ * The tag hangs under the card rather than in the flow below it, so the hand
+ * takes no height of its own and the card's bottom edge is the table's edge.
+ */
+.hand__tag {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0.2rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #8a6720;
+  white-space: nowrap;
+}
+@keyframes hand-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 26px) scale(0.8);
   }
 }
 

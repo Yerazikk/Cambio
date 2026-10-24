@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { INITIAL_PEEKS, isInitialPeekSlot, type Action, type Card, type GameView, type PlayerId } from "@cambio/shared";
-import type { Flash } from "../components/Card.js";
+import { CardFace, type Flash } from "../components/Card.js";
 import { Piles } from "../components/Piles.js";
 import { Seat } from "../components/Seat.js";
 import { SnapBar } from "../components/SnapBar.js";
@@ -205,6 +205,20 @@ export function Table(props: TableProps): React.JSX.Element {
             heldFromDiscard={view.heldFromDiscard}
           />
         ))}
+
+        {/*
+          The card in your own hand. Everyone else's sits on the felt at their
+          seat, but yours is not on the table at all - you are holding it, so
+          it comes up in front of you, tilted towards your eye and big enough
+          to read at a glance, the way the card you are deciding about should
+          be the loudest thing on the screen.
+        */}
+        {view.heldBy === me && (
+          <div className="hand" data-testid="held-card">
+            <CardFace card={view.heldCard} />
+            <span className="hand__tag">{view.heldFromDiscard ? "taken" : "drawn"}</span>
+          </div>
+        )}
 
         <TableLog lines={log} />
       </div>
