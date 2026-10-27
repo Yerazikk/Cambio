@@ -1,8 +1,12 @@
 # One service: the Node server builds the client and then serves it alongside
 # the WebSocket endpoint, so the page and its socket always share an origin.
+#
+# No `builder` key on purpose: the service is configured for Railpack, which
+# honours engines.node/engines.npm and uses the npm bundled with Node. Pinning
+# NIXPACKS here forced npm 9 (it has no npm-10 package) onto a lockfile written
+# by npm 10.9.
 [build]
-builder = "NIXPACKS"
-buildCommand = "npm ci && npm run build"
+buildCommand = "node -v && npm -v && npm run build"
 
 [deploy]
 startCommand = "npm start"
