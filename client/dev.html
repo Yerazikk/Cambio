@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cambio harness</title>
+    <!--
+      A development-only page: a whole table of real clients, side by side in
+      one tab. It is a separate entry rather than a branch inside the real one,
+      so it cannot reach production - the build has a single input, index.html,
+      and this file is not it.
+    -->
+    <style>
+      html {
+        background: #15171b;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/dev/harness-main.tsx"></script>
+  </body>
+</html>

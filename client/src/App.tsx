@@ -4,10 +4,19 @@ import { Home } from "./screens/Home.js";
 import { Lobby } from "./screens/Lobby.js";
 import { Table } from "./screens/Table.js";
 import { Toasts } from "./components/Toasts.js";
-import { useGame } from "./state/useGame.js";
+import { useGame, type GameStore } from "./state/useGame.js";
 
 export function App(): React.JSX.Element {
   const game = useGame();
+  return <Game game={game} />;
+}
+
+/**
+ * The whole interface, over a store handed to it rather than one it opens for
+ * itself. The seam exists for the dev harness, which drives the seat it is
+ * rendering - every other caller is `App` above.
+ */
+export function Game({ game }: { game: GameStore }): React.JSX.Element {
   const { view, me, status } = game;
 
   // The back is one table-wide setting, so it rides down as a custom property

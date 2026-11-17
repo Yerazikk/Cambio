@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cambio seat</title>
+    <!--
+      One pane of the dev harness. A separate entry rather than a branch in the
+      real one, so nothing about the harness can reach a production build: the
+      build has a single input, index.html, and this file is not it.
+    -->
+    <style>
+      html {
+        background: #f4f3ef;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/dev/seat-main.tsx"></script>
+  </body>
+</html>

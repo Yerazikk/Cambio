@@ -6,7 +6,24 @@ import type { ClientMsg, ServerEvent } from "@cambio/shared";
  * different players. That is what makes local multiplayer testing work, and it
  * is also the right semantics - a seat belongs to a tab, not to a browser.
  */
-const TOKEN_KEY = "cambio.token";
+export const DEFAULT_TOKEN_KEY = "cambio.token";
+
+/**
+ * The dev harness seats several players in one tab, as iframes, which would
+ * otherwise have them all fighting over that one key. Each pane carries
+ * `?seat=<n>`, and in development that namespaces the key per pane - so panes
+ * are as separate from each other as tabs are. A production build never reads
+ * the parameter.
+ */
+export function seatTokenKey(seat: string): string {
+  return `${DEFAULT_TOKEN_KEY}.${seat}`;
+}
+
+const TOKEN_KEY = ((): string => {
+  if (!import.meta.env.DEV) return DEFAULT_TOKEN_KEY;
+  const seat = new URLSearchParams(location.search).get("seat");
+  return seat === null ? DEFAULT_TOKEN_KEY : seatTokenKey(seat);
+})();
 
 export function readToken(): string | null {
   try {

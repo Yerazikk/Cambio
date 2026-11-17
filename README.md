@@ -192,6 +192,34 @@ the server, so the single-origin assumption holds in development too. The
 session token lives in `sessionStorage`, which is per-tab, so each tab is a
 separate player — and a refresh puts you back in your seat.
 
+### A whole table in one tab
+
+Opening four tabs, typing four names and copying the code between them is a lot
+of ceremony to look at one lobby, so there is a harness:
+
+```
+http://localhost:5173/dev.html
+```
+
+It seats two to six players side by side on one screen. The first pane creates
+the table and the rest join it, so the lobby is live the moment the page loads
+and you play the panes — every move showing at once on every screen it should
+show on, which is the half of this game that only exists between clients.
+
+Nothing in it is simulated. Each pane is an iframe of the real client, with its
+own document, its own socket and its own seat, exactly as separate as four
+people on four machines; the harness only types the name and presses the button
+for you. A pane carries `?seat=<n>`, which in development namespaces its session
+token so the panes do not fight over the one key — that parameter, and the
+harness itself, exist only in a dev build: `index.html` is the build's single
+entry, and `dev.html` is not it.
+
+Per pane: **Expand** for one screen full size, **Reload** to put that client
+through a refresh and watch it resume its seat, and **Disconnect** to pull the
+plug and watch the table mark it away and hold the seat. The pane viewport is a
+real choice of size, so a phone layout can be checked next to a desktop one, and
+the code is in the toolbar if you want to join from an ordinary tab as well.
+
 Production is a single process:
 
 ```bash
