@@ -1,4 +1,4 @@
-export type SnapBarProps = {
+export type SlapBarProps = {
   open: boolean;
   armed: boolean;
   pending: boolean;
@@ -8,43 +8,43 @@ export type SnapBarProps = {
 };
 
 /**
- * The snap control.
+ * The slap control.
  *
  * Card clicks are already spoken for by whatever the player is in the middle of
- * doing, so snapping gets its own explicit gesture rather than overloading
- * them. Arming is one click and then any card is a snap target; the numbered
+ * doing, so slapping gets its own explicit gesture rather than overloading
+ * them. Arming is one click and then any card is a slap target; the numbered
  * keys are the fast path for your own cards, which is the common case and the
  * one where milliseconds actually decide the race.
  */
-export function SnapBar({ open, armed, pending, ownSlots, onArm }: SnapBarProps): React.JSX.Element {
-  const classes = ["snapbar"];
-  if (armed) classes.push("snapbar--armed");
-  if (pending) classes.push("snapbar--pending");
+export function SlapBar({ open, armed, pending, ownSlots, onArm }: SlapBarProps): React.JSX.Element {
+  const classes = ["slapbar"];
+  if (armed) classes.push("slapbar--armed");
+  if (pending) classes.push("slapbar--pending");
 
   return (
     <div className={classes.join(" ")}>
       <button
         type="button"
-        className="snapbar__button"
+        className="slapbar__button"
         disabled={!open}
         onClick={() => onArm(!armed)}
-        data-testid="snap-button"
+        data-testid="slap-button"
         aria-pressed={armed}
       >
-        {pending ? "SNAP!" : armed ? "Pick a card" : "SNAP"}
+        {pending ? "SLAP!" : armed ? "Pick a card" : "SLAP"}
       </button>
 
-      <p className="snapbar__hint">
+      <p className="slapbar__hint">
         {!open ? (
-          "Snapping opens once the round is under way."
+          "Slapping opens once the round is under way."
         ) : armed ? (
-          "Click any card to snap it. Esc to cancel."
+          "Click any card to slap it. Esc to cancel."
         ) : (
           <>
             Press <kbd>S</kbd>, or{" "}
             {ownSlots > 0 ? (
               <>
-                <kbd>1</kbd>&ndash;<kbd>{ownSlots}</kbd> to snap your own card
+                <kbd>1</kbd>&ndash;<kbd>{ownSlots}</kbd> to slap your own card
               </>
             ) : (
               "arm it above"

@@ -97,7 +97,7 @@ export async function startServer(options: StartOptions = {}): Promise<RunningSe
   const timers: NodeJS.Timeout[] = [];
   const pingMs = options.pingIntervalMs === undefined ? RTT_PING_INTERVAL_MS : options.pingIntervalMs;
   if (pingMs !== null) {
-    // Measuring latency ourselves is what makes the snap race fair.
+    // Measuring latency ourselves is what makes the slap race fair.
     timers.push(setInterval(() => gateway.pingAll(), pingMs));
   }
   const reapMs = options.reapIntervalMs === undefined ? Math.min(ROOM_REAP_IDLE_MS, 60_000) : options.reapIntervalMs;

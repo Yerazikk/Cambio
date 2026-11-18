@@ -133,7 +133,7 @@ describe("powers by rank", () => {
   });
 });
 
-describe("snap matching", () => {
+describe("slap matching", () => {
   it("matches on rank alone, ignoring suit", () => {
     expect(ranksMatch(7, 7)).toBe(true);
     expect(ranksMatch(7, 8)).toBe(false);

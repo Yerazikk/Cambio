@@ -12,7 +12,7 @@ export type PilesProps = {
    * anyone who reaches for the table rather than the button.
    */
   canDiscardDrawn: boolean;
-  snapArmed: boolean;
+  slapArmed: boolean;
   /** Set briefly when a card has just come off or landed on that pile. */
   deckMoved: boolean;
   discardMoved: boolean;
@@ -22,7 +22,7 @@ export type PilesProps = {
 };
 
 /**
- * The middle of the table: the deck to draw from and the pile to snap against.
+ * The middle of the table: the deck to draw from and the pile to slap against.
  *
  * Both are drawn as stacks rather than single cards. It is the one place where
  * depth is information - you can see at a glance that there is still something
@@ -35,7 +35,7 @@ export function Piles({
   canDrawDeck,
   canDrawDiscard,
   canDiscardDrawn,
-  snapArmed,
+  slapArmed,
   deckMoved,
   discardMoved,
   onDrawDeck,
@@ -44,7 +44,7 @@ export function Piles({
 }: PilesProps): React.JSX.Element {
   // The two uses of the discard pile never overlap - you are either starting a
   // turn or finishing one - so one click target carries both.
-  const discardLive = (canDrawDiscard || canDiscardDrawn) && !snapArmed;
+  const discardLive = (canDrawDiscard || canDiscardDrawn) && !slapArmed;
 
   return (
     <div className="piles">
@@ -53,7 +53,7 @@ export function Piles({
           <CardFace
             card={null}
             size="large"
-            state={canDrawDeck && !snapArmed ? "targetable" : "idle"}
+            state={canDrawDeck && !slapArmed ? "targetable" : "idle"}
             onClick={onDrawDeck}
             testId="deck"
           />

@@ -22,7 +22,7 @@ export const MAX_PLAYERS = 6;
 
 /**
  * How many packs the table plays with, and the range the host may pick from.
- * More packs means more of every rank in play, so snaps come up far more often
+ * More packs means more of every rank in play, so slaps come up far more often
  * and the deck runs down more slowly.
  */
 export const CARDS_PER_DECK = 54;
@@ -63,11 +63,11 @@ export function isCardBack(id: string): boolean {
 }
 
 /**
- * How long the arbiter waits, after the first snap lands, before deciding the
+ * How long the arbiter waits, after the first slap lands, before deciding the
  * race. Must comfortably exceed the spread in players' one-way latency, or
  * well-connected players win purely on network position.
  */
-export const SNAP_WINDOW_MS = 200;
+export const SLAP_WINDOW_MS = 200;
 
 /**
  * How long a peeked card stays face up on the peeker's screen. Cambio is a
@@ -81,8 +81,8 @@ export const TURN_MS = 45_000;
 
 /** Added to the caller's score when they call Cambio without the lowest hand. */
 export const CAMBIO_PENALTY = 10;
-/** Whether snapping stays live during the final turns after a Cambio call. */
-export const SNAP_AFTER_CAMBIO = true;
+/** Whether slapping stays live during the final turns after a Cambio call. */
+export const SLAP_AFTER_CAMBIO = true;
 
 /**
  * false  — a peek is shown once and then forgotten by the server, so remembering
@@ -101,7 +101,7 @@ export const SERVER_REMEMBERS_PEEKS = false;
 export const RECONNECT_GRACE_IN_GAME_MS = 60_000;
 export const RECONNECT_GRACE_LOBBY_MS = 10_000;
 
-/** Round-trip-time sampling, used to compensate the snap race. */
+/** Round-trip-time sampling, used to compensate the slap race. */
 export const RTT_PING_INTERVAL_MS = 2_000;
 export const RTT_EWMA_ALPHA = 0.25;
 /** RTT assumed for a player who has not yet answered a ping. */
@@ -119,11 +119,11 @@ export type RuleConfig = {
   decks: number;
   handSize: number;
   initialPeeks: number;
-  snapWindowMs: number;
+  slapWindowMs: number;
   peekMs: number;
   turnMs: number;
   cambioPenalty: number;
-  snapAfterCambio: boolean;
+  slapAfterCambio: boolean;
   serverRemembersPeeks: boolean;
 };
 
@@ -131,10 +131,10 @@ export const DEFAULT_RULES: RuleConfig = {
   decks: DECKS,
   handSize: HAND_SIZE,
   initialPeeks: INITIAL_PEEKS,
-  snapWindowMs: SNAP_WINDOW_MS,
+  slapWindowMs: SLAP_WINDOW_MS,
   peekMs: PEEK_MS,
   turnMs: TURN_MS,
   cambioPenalty: CAMBIO_PENALTY,
-  snapAfterCambio: SNAP_AFTER_CAMBIO,
+  slapAfterCambio: SLAP_AFTER_CAMBIO,
   serverRemembersPeeks: SERVER_REMEMBERS_PEEKS,
 };

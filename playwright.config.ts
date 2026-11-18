@@ -9,7 +9,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   /**
    * Rooms live in the server's memory, so the suite shares real state. One
-   * worker keeps tables from colliding and keeps snap-race timings honest.
+   * worker keeps tables from colliding and keeps slap-race timings honest.
    */
   fullyParallel: false,
   workers: 1,

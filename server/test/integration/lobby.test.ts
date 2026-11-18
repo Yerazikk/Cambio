@@ -144,7 +144,7 @@ describe("starting the game", () => {
 
     const view = await clients[0]!.waitForState((v) => v.phase === "study");
     expect(view.players.every((p) => p.slots.length === 4)).toBe(true);
-    expect(view.discardTop).not.toBeNull(); // a snap is legal from move one
+    expect(view.discardTop).not.toBeNull(); // a slap is legal from move one
     expect(view.deckCount).toBe(54 - 2 * 4 - 1);
   });
 

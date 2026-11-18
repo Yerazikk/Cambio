@@ -9,7 +9,6 @@ import type {
   PlayerId,
   ServerEvent,
   SlotRef,
-  SnapOutcome,
   TableEventKind,
 } from "@cambio/shared";
 import type { Flash } from "../components/Card.js";
@@ -20,7 +19,7 @@ export type Reveal = { ownerId: PlayerId; slot: number; card: Card; expiresAt: n
 
 export type Toast = { id: number; kind: "info" | "good" | "bad"; text: string };
 
-/** A card mid-gesture: flipped, swapped, snapped. Everyone sees the same one. */
+/** A card mid-gesture: flipped, swapped, slapped. Everyone sees the same one. */
 export type SlotFlash = { ownerId: PlayerId; slot: number; kind: Flash; expiresAt: number };
 
 /** Which pile just moved, so it can pulse along with the hands. */
@@ -47,10 +46,10 @@ export type GameStore = {
   log: LogLine[];
   /** Set for as long as a fresh hand is being dealt out to the seats. */
   dealing: boolean;
-  /** While armed, clicking any card snaps it instead of playing it. */
-  snapArmed: boolean;
-  /** Set the instant a snap is sent, for feedback that does not wait for the server. */
-  snapPending: boolean;
+  /** While armed, clicking any card slaps it instead of playing it. */
+  slapArmed: boolean;
+  /** Set the instant a slap is sent, for feedback that does not wait for the server. */
+  slapPending: boolean;
   pick: PickOne;
 
   createRoom: (name: string) => void;
@@ -63,8 +62,8 @@ export type GameStore = {
   restart: () => void;
   act: (action: Action) => void;
 
-  armSnap: (armed: boolean) => void;
-  snap: (targetId: PlayerId, slot: number) => void;
+  armSlap: (armed: boolean) => void;
+  slap: (targetId: PlayerId, slot: number) => void;
   setPick: (pick: PickOne) => void;
   dismissKick: () => void;
   revealFor: (ownerId: PlayerId, slot: number) => Card | null;
@@ -73,7 +72,7 @@ export type GameStore = {
   pileFlash: (pile: "deck" | "discard") => boolean;
 };
 
-const SNAP_ARM_MS = 3_000;
+const SLAP_ARM_MS = 3_000;
 const TOAST_MS = 3_500;
 /** How long a move stays visible as an animation. Long enough to catch across the table. */
 const FLASH_MS = 1_100;
@@ -96,8 +95,8 @@ export function useGame(): GameStore {
   const [piles, setPiles] = useState<PileFlash[]>([]);
   const [log, setLog] = useState<LogLine[]>([]);
   const [dealing, setDealing] = useState(false);
-  const [snapArmed, setSnapArmed] = useState(false);
-  const [snapPending, setSnapPending] = useState(false);
+  const [slapArmed, setSlapArmed] = useState(false);
+  const [slapPending, setSlapPending] = useState(false);
   const [pick, setPick] = useState<PickOne>(null);
 
   const connection = useRef<Connection | null>(null);
@@ -111,7 +110,7 @@ export function useGame(): GameStore {
    *
    * The socket is opened once, so the event handler it is given is captured
    * once too. Reading `me` from state inside that handler would read the value
-   * from first render - null - forever, which is how "You snapped" came out as
+   * from first render - null - forever, which is how "You slapped" came out as
    * the player's own name.
    */
   const meRef = useRef<PlayerId | null>(null);
@@ -197,14 +196,19 @@ export function useGame(): GameStore {
           return;
         }
 
-        case "snap.resolved": {
-          setSnapPending(false);
-          setSnapArmed(false);
-          if (event.winnerId !== null && event.outcome !== "noLongerValid") {
-            markFlash("snap", [{ ownerId: event.targetId, slot: event.slot }]);
+        case "slap.resolved": {
+          // A contested race arrives as several of these, one per slap the
+          // queue reached. Only the one about my own slap settles my pending
+          // flash; the rest are other people's slaps, to watch and be told of.
+          if (event.slapperId === meRef.current) {
+            setSlapPending(false);
+            setSlapArmed(false);
+          }
+          if (event.outcome !== "noLongerValid" && event.outcome !== "lostRace") {
+            markFlash("slap", [{ ownerId: event.targetId, slot: event.slot }]);
             if (event.outcome !== "wrongRankPenalty") markPile("discard");
           }
-          pushToast(...describeSnap(event.outcome, event.winnerId, event.marginMs, namesRef.current, meRef.current));
+          pushToast(...describeSlap(event, namesRef.current, meRef.current));
           return;
         }
 
@@ -231,7 +235,7 @@ export function useGame(): GameStore {
             clearToken();
             return;
           }
-          setSnapPending(false);
+          setSlapPending(false);
           pushToast("bad", event.message);
           return;
         }
@@ -293,25 +297,25 @@ export function useGame(): GameStore {
     return () => clearTimeout(timer);
   }, [dealing]);
 
-  /** Snap mode disarms itself, so a stray later click does not snap by accident. */
+  /** Slap mode disarms itself, so a stray later click does not slap by accident. */
   useEffect(() => {
-    if (!snapArmed) return;
-    const timer = setTimeout(() => setSnapArmed(false), SNAP_ARM_MS);
+    if (!slapArmed) return;
+    const timer = setTimeout(() => setSlapArmed(false), SLAP_ARM_MS);
     return () => clearTimeout(timer);
-  }, [snapArmed]);
+  }, [slapArmed]);
 
   const send = useCallback((msg: ClientMsg) => connection.current?.send(msg), []);
 
   const act = useCallback((action: Action) => send({ t: "act", action }), [send]);
 
-  const snap = useCallback(
+  const slap = useCallback(
     (targetId: PlayerId, slot: number) => {
       // Flash locally at once. The server is still the authority, and will
-      // correct this with a snap.resolved either way.
-      setSnapPending(true);
-      setSnapArmed(false);
+      // correct this with a slap.resolved either way.
+      setSlapPending(true);
+      setSlapArmed(false);
       setPick(null);
-      send({ t: "act", action: { a: "snap", targetId, slot } });
+      send({ t: "act", action: { a: "slap", targetId, slot } });
     },
     [send],
   );
@@ -343,8 +347,8 @@ export function useGame(): GameStore {
       reveals,
       log,
       dealing,
-      snapArmed,
-      snapPending,
+      slapArmed,
+      slapPending,
       pick,
       createRoom: (name) => send({ t: "room.create", name }),
       joinRoom: (code, name) => send({ t: "room.join", code: code.trim().toUpperCase(), name }),
@@ -361,8 +365,8 @@ export function useGame(): GameStore {
       start: () => send({ t: "lobby.start" }),
       restart: () => send({ t: "lobby.restart" }),
       act,
-      armSnap: setSnapArmed,
-      snap,
+      armSlap: setSlapArmed,
+      slap,
       setPick,
       dismissKick: () => setKicked(null),
       revealFor,
@@ -378,12 +382,12 @@ export function useGame(): GameStore {
       reveals,
       log,
       dealing,
-      snapArmed,
-      snapPending,
+      slapArmed,
+      slapPending,
       pick,
       send,
       act,
-      snap,
+      slap,
       revealFor,
       flashFor,
       pileFlash,
@@ -470,29 +474,33 @@ function describeTableEvent(
   }
 }
 
-function describeSnap(
-  outcome: SnapOutcome,
-  winnerId: PlayerId | null,
-  marginMs: number | null,
+function describeSlap(
+  event: Extract<ServerEvent, { t: "slap.resolved" }>,
   names: Map<PlayerId, string>,
   me: PlayerId | null,
 ): [Toast["kind"], string] {
-  const winner = winnerId === null ? "nobody" : winnerId === me ? "You" : (names.get(winnerId) ?? "someone");
-  const by = marginMs !== null && marginMs > 0 ? ` by ${Math.round(marginMs)}ms` : "";
+  const mine = event.slapperId === me;
+  const nameOf = (id: PlayerId): string => (id === me ? "You" : (names.get(id) ?? "someone"));
+  const slapper = nameOf(event.slapperId);
+  const by = event.marginMs !== null && event.marginMs > 0 ? ` by ${Math.round(event.marginMs)}ms` : "";
 
-  switch (outcome) {
+  switch (event.outcome) {
     case "ownCardDiscarded":
-      return [winnerId === me ? "good" : "info", `${winner} snapped${by}`];
+      return [mine ? "good" : "info", `${slapper} slapped${by}`];
     case "otherCardDiscarded":
-      return [winnerId === me ? "good" : "info", `${winner} snapped someone else's card${by}`];
+      return [mine ? "good" : "info", `${slapper} slapped someone else's card${by}`];
     case "wrongRankPenalty":
-      return [winnerId === me ? "bad" : "info", `${winner} snapped wrong and took a card`];
+      return [mine ? "bad" : "info", `${slapper} slapped wrong and took a card`];
     case "lostRace":
-      return ["bad", `Too slow - ${winner} got there first${by}`];
+      // Being behind in the queue is a reprieve, not a loss: the slap ahead of
+      // yours was right, so yours never had to be played.
+      return event.endedById === null
+        ? ["info", "Your slap was too late"]
+        : ["info", `${nameOf(event.endedById)} got there first - your slap was not played`];
     case "noLongerValid":
-      return ["info", "That snap was no longer valid"];
+      return ["info", "That slap was no longer valid"];
     default:
-      return ["info", "Snap"];
+      return ["info", "Slap"];
   }
 }
 

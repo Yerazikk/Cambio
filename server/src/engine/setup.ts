@@ -23,7 +23,7 @@ export function emptyState(code: RoomCode, hostId: PlayerId, rules: RuleConfig =
     held: null,
     pendingPower: null,
     kingPeeked: false,
-    snapGiveFor: null,
+    slapGiveFor: null,
     cambioCallerId: null,
     finalTurnsRemaining: null,
     winnerId: null,
@@ -33,7 +33,7 @@ export function emptyState(code: RoomCode, hostId: PlayerId, rules: RuleConfig =
 
 /**
  * Deal a fresh round. Each player gets `handSize` cards and one card is turned
- * up to seed the discard pile, so a snap is legal from the first move.
+ * up to seed the discard pile, so a slap is legal from the first move.
  */
 export function startRound(state: GameState, rng: Rng): GameState {
   const deck = genCambioDeck(rng, state.rules.decks);
@@ -66,7 +66,7 @@ export function startRound(state: GameState, rng: Rng): GameState {
     held: null,
     pendingPower: null,
     kingPeeked: false,
-    snapGiveFor: null,
+    slapGiveFor: null,
     cambioCallerId: null,
     finalTurnsRemaining: null,
     winnerId: null,

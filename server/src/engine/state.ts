@@ -15,7 +15,7 @@ export type Seat = {
   id: PlayerId;
   name: string;
   connected: boolean;
-  /** Slot index -> card. Length is variable: snaps shrink it, penalties grow it. */
+  /** Slot index -> card. Length is variable: slaps shrink it, penalties grow it. */
   hand: CardId[];
   /** Which slots this player studied before the first turn, in click order. */
   initialPeeked: number[];
@@ -56,8 +56,8 @@ export type GameState = {
   pendingPower: Power | null;
   /** True once a king's peek is spent, so only the swap-or-skip choice remains. */
   kingPeeked: boolean;
-  /** Set while a snapper who took another player's card owes them one back. */
-  snapGiveFor: { snapperId: PlayerId; targetId: PlayerId } | null;
+  /** Set while a slapper who took another player's card owes them one back. */
+  slapGiveFor: { slapperId: PlayerId; targetId: PlayerId } | null;
   cambioCallerId: PlayerId | null;
   finalTurnsRemaining: number | null;
   winnerId: PlayerId | null;
@@ -105,11 +105,11 @@ export function discardTopCard(state: GameState): Card | null {
   return id === undefined ? null : (state.cards.get(id) ?? null);
 }
 
-/** Snapping is legal whenever there is a discard top to match against. */
-export function snapOpen(state: GameState): boolean {
+/** Slapping is legal whenever there is a discard top to match against. */
+export function slapOpen(state: GameState): boolean {
   if (state.phase === "lobby" || state.phase === "study" || state.phase === "finished") return false;
-  if (state.snapGiveFor !== null) return false;
-  if (state.cambioCallerId !== null && !state.rules.snapAfterCambio) return false;
+  if (state.slapGiveFor !== null) return false;
+  if (state.cambioCallerId !== null && !state.rules.slapAfterCambio) return false;
   return discardTopId(state) !== undefined;
 }
 
@@ -168,9 +168,9 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
     heldFromDiscard: state.held?.fromDiscard ?? false,
     pendingPower: isViewersTurn ? state.pendingPower : null,
     kingPeeked: state.kingPeeked,
-    snapDebt: state.snapGiveFor,
+    slapDebt: state.slapGiveFor,
     finalTurnsRemaining: state.finalTurnsRemaining,
-    snapOpen: snapOpen(state),
+    slapOpen: slapOpen(state),
     winnerId: state.winnerId,
   };
 }
@@ -183,5 +183,5 @@ export const PHASES_IN_ROUND: readonly Phase[] = [
   "powerPeekOther",
   "powerFreeSwap",
   "powerKing",
-  "snapGiveCard",
+  "slapGiveCard",
 ];

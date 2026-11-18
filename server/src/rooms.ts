@@ -16,19 +16,19 @@ import {
   type RoomCode,
   type RuleConfig,
 } from "@cambio/shared";
-import { reduce, type Outbound, type ReduceCtx } from "./engine/reduce.js";
+import { reduce, slapLanded, type Outbound, type ReduceCtx } from "./engine/reduce.js";
 import { addSeat, emptyState, startRound } from "./engine/setup.js";
-import { seatOf, snapOpen, viewFor, type GameState } from "./engine/state.js";
+import { seatOf, slapOpen, viewFor, type GameState } from "./engine/state.js";
 import type { Rng } from "./rng.js";
 import { RttTracker } from "./rtt.js";
-import { SnapArbiter, realScheduler, type Scheduler, type SnapRace } from "./snap.js";
+import { SlapArbiter, realScheduler, type Scheduler, type SlapRace } from "./slap.js";
 
 export type Session = { token: string; playerId: PlayerId; code: RoomCode };
 
 export type Room = {
   code: RoomCode;
   state: GameState;
-  arbiter: SnapArbiter;
+  arbiter: SlapArbiter;
   rtt: RttTracker;
   /** Seats whose player has dropped but whose grace period is still running. */
   graceHandles: Map<PlayerId, unknown>;
@@ -54,7 +54,7 @@ export type RoomManagerOptions = {
   /** Override how long a dropped player's seat is held. Tests shorten this. */
   graceMs?: { inGame?: number; lobby?: number };
   /**
-   * Output produced by a timer rather than by a client message: a settled snap
+   * Output produced by a timer rather than by a client message: a settled slap
    * race, an expired grace period, a turn that ran out of clock.
    */
   onAsync?: (code: RoomCode, out: Outbound[]) => void;
@@ -151,11 +151,11 @@ export class RoomManager {
       code,
       state,
       rtt: new RttTracker(this.opts.now),
-      arbiter: new SnapArbiter({
-        windowMs: this.rules.snapWindowMs,
+      arbiter: new SlapArbiter({
+        windowMs: this.rules.slapWindowMs,
         now: this.opts.now,
         scheduler: this.scheduler,
-        onResolve: (race) => this.onSnapRace(code, race),
+        onResolve: (race) => this.onSlapRace(code, race),
       }),
       graceHandles: new Map(),
       turnHandle: null,
@@ -387,7 +387,7 @@ export class RoomManager {
     const room = this.rooms.get(code);
     if (!room) return err("roomNotFound", "that room no longer exists");
 
-    if (action.a === "snap") return this.submitSnap(room, playerId, action.targetId, action.slot);
+    if (action.a === "slap") return this.submitSlap(room, playerId, action.targetId, action.slot);
 
     const result = reduce(room.state, playerId, action, this.ctx());
     if (!result.ok) return err(result.code, result.message);
@@ -399,12 +399,13 @@ export class RoomManager {
   }
 
   /**
-   * Enter a snap into the race. Nothing is applied yet: the arbiter holds the
-   * window open so a player on a worse connection still gets a fair shot.
+   * Enter a slap into the race. Nothing is applied yet: the arbiter holds the
+   * window open so a player on a worse connection still gets a fair shot at
+   * being first in the queue.
    */
-  private submitSnap(room: Room, playerId: PlayerId, targetId: PlayerId, slot: number): Result<{ out: Outbound[] }> {
+  private submitSlap(room: Room, playerId: PlayerId, targetId: PlayerId, slot: number): Result<{ out: Outbound[] }> {
     if (!seatOf(room.state, playerId)) return err("sessionInvalid", "you are not seated at this table");
-    if (!snapOpen(room.state)) return err("illegalAction", "you cannot snap right now");
+    if (!slapOpen(room.state)) return err("illegalAction", "you cannot slap right now");
 
     room.arbiter.submit({
       playerId,
@@ -416,45 +417,64 @@ export class RoomManager {
     return { ok: true, out: [] };
   }
 
-  /** Called when a snap window closes. Applies the winner and tells the losers. */
-  private onSnapRace(code: RoomCode, race: SnapRace): void {
+  /**
+   * Called when a slap window closes. Plays the queue out in order.
+   *
+   * Slapping at the same moment as someone else does not cancel your slap, it
+   * puts you behind them: each slap in turn is applied in full, and the queue
+   * stops at the first one that is right. If the player ahead of you was
+   * wrong, yours is still played - penalty and all.
+   */
+  private onSlapRace(code: RoomCode, race: SlapRace): void {
     const room = this.rooms.get(code);
     if (!room) return;
 
     const out: Outbound[] = [];
+    let endedById: PlayerId | null = null;
+    let played = 0;
 
-    if (race.winner !== null) {
+    for (const claim of race.order) {
+      played += 1;
       const result = reduce(
         room.state,
-        race.winner.playerId,
+        claim.playerId,
         {
-          a: "snapResolve",
-          winnerId: race.winner.playerId,
-          targetId: race.winner.targetId,
-          slot: race.winner.slot,
-          marginMs: race.marginMs,
+          a: "slapResolve",
+          slapperId: claim.playerId,
+          targetId: claim.targetId,
+          slot: claim.slot,
+          // The first slap is reported by how far clear it was; every one
+          // after it by how far behind the first it landed.
+          marginMs: played === 1 ? race.marginMs : claim.behindMs,
         },
         this.ctx(),
       );
-      if (result.ok) {
-        room.state = result.state;
-        out.push(...result.out);
-        this.armTurnClock(room);
+      if (!result.ok) continue;
+
+      room.state = result.state;
+      out.push(...result.out);
+      this.armTurnClock(room);
+
+      if (landed(result.out)) {
+        endedById = claim.playerId;
+        break;
       }
     }
 
-    // Everyone who lost the race is told so individually, so their optimistic
-    // local flash can be rolled back.
-    for (const loser of race.losers) {
+    // Whoever is still in the queue behind a slap that landed never has to play
+    // theirs. They are told individually, so an optimistic local flash can be
+    // rolled back - the rest of the table has no business knowing they tried.
+    for (const spared of [...race.order.slice(played), ...race.late]) {
       out.push({
-        to: loser.playerId,
+        to: spared.playerId,
         event: {
-          t: "snap.resolved",
-          winnerId: race.winner?.playerId ?? null,
-          targetId: loser.targetId,
-          slot: loser.slot,
+          t: "slap.resolved",
+          slapperId: spared.playerId,
+          targetId: spared.targetId,
+          slot: spared.slot,
           outcome: "lostRace",
-          marginMs: race.marginMs,
+          endedById,
+          marginMs: spared.behindMs,
         },
       });
     }
@@ -556,8 +576,8 @@ function autoPlay(state: GameState): Action | null {
     case "powerFreeSwap":
     case "powerKing":
       return { a: "forfeitPower" };
-    case "snapGiveCard":
-      return { a: "snapGive", slot: 0 };
+    case "slapGiveCard":
+      return { a: "slapGive", slot: 0 };
     default:
       return null;
   }
@@ -566,4 +586,9 @@ function autoPlay(state: GameState): Action | null {
 function cleanName(raw: string, fallback: string): string {
   const trimmed = raw.trim().slice(0, 16);
   return trimmed.length > 0 ? trimmed : fallback;
+}
+
+/** Did the slap just reduced actually land, and so end the queue behind it? */
+function landed(out: readonly Outbound[]): boolean {
+  return out.some((o) => o.event.t === "slap.resolved" && slapLanded(o.event.outcome));
 }

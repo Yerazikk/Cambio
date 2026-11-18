@@ -594,7 +594,7 @@ describe("running out of deck", () => {
     const result = reduce(state, "ana", { a: "drawDeck" }, ctx);
     if (!result.ok) throw new Error(result.message);
 
-    // H5 stayed face up as the snap target; the rest became the new deck.
+    // H5 stayed face up as the slap target; the rest became the new deck.
     expect(result.state.discard).toEqual(["H5"]);
     expect(result.state.deck.length + 1).toBe(3); // 3 reshuffled, 1 now held
     expect(result.state.held?.cardId).not.toBe("H5");
@@ -618,12 +618,12 @@ describe("guards that apply everywhere", () => {
     expect(rejected(twoHanded(), "stranger", { a: "drawDeck" })).toBe("sessionInvalid");
   });
 
-  it("refuses a raw snap, which belongs to the arbiter", () => {
-    expect(rejected(twoHanded(), "ana", { a: "snap", targetId: "ana", slot: 0 })).toBe("illegalAction");
+  it("refuses a raw slap, which belongs to the arbiter", () => {
+    expect(rejected(twoHanded(), "ana", { a: "slap", targetId: "ana", slot: 0 })).toBe("illegalAction");
   });
 
-  it("refuses a snap payment from someone who owes nothing", () => {
-    expect(rejected(twoHanded(), "ana", { a: "snapGive", slot: 0 })).toBe("illegalAction");
+  it("refuses a slap payment from someone who owes nothing", () => {
+    expect(rejected(twoHanded(), "ana", { a: "slapGive", slot: 0 })).toBe("illegalAction");
   });
 
   it("refuses play actions once the round is finished", () => {

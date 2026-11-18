@@ -78,7 +78,7 @@ export function fixture(spec: Fixture): GameState {
     held: null,
     pendingPower: null,
     kingPeeked: false,
-    snapGiveFor: null,
+    slapGiveFor: null,
     cambioCallerId: null,
     finalTurnsRemaining: null,
     winnerId: null,

@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { backImageUrl } from "./backs.js";
 import { GameOver } from "./screens/GameOver.js";
 import { Home } from "./screens/Home.js";
 import { Lobby } from "./screens/Lobby.js";
 import { Table } from "./screens/Table.js";
+import { RulesHelp } from "./components/RulesHelp.js";
 import { Toasts } from "./components/Toasts.js";
 import { useGame, type GameStore } from "./state/useGame.js";
 
@@ -18,6 +20,12 @@ export function App(): React.JSX.Element {
  */
 export function Game({ game }: { game: GameStore }): React.JSX.Element {
   const { view, me, status } = game;
+  /**
+   * The rule book lives up here rather than inside its own component because
+   * the table listens for the same keys that slap, and must stand down while
+   * somebody is reading.
+   */
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // The back is one table-wide setting, so it rides down as a custom property
   // rather than threading a prop through every card on screen.
@@ -58,14 +66,15 @@ export function Game({ game }: { game: GameStore }): React.JSX.Element {
         <Table
           view={view}
           me={me}
-          snapArmed={game.snapArmed}
-          snapPending={game.snapPending}
+          slapArmed={game.slapArmed}
+          slapPending={game.slapPending}
+          keysHeld={helpOpen}
           dealing={game.dealing}
           pick={game.pick}
           log={game.log}
           act={game.act}
-          snap={game.snap}
-          armSnap={game.armSnap}
+          slap={game.slap}
+          armSlap={game.armSlap}
           setPick={game.setPick}
           revealFor={game.revealFor}
           flashFor={game.flashFor}
@@ -75,6 +84,9 @@ export function Game({ game }: { game: GameStore }): React.JSX.Element {
       )}
 
       <Toasts toasts={game.toasts} />
+
+      {/* The rule book sits in the corner of every screen, lobby included. */}
+      <RulesHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
 }

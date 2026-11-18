@@ -3,7 +3,7 @@ import { INITIAL_PEEKS, isInitialPeekSlot, type Action, type Card, type GameView
 import { CardFace, type Flash } from "../components/Card.js";
 import { Piles } from "../components/Piles.js";
 import { Seat } from "../components/Seat.js";
-import { SnapBar } from "../components/SnapBar.js";
+import { SlapBar } from "../components/SlapBar.js";
 import { TableLog } from "../components/TableLog.js";
 import { TurnClock } from "../components/TurnClock.js";
 import { seatRing } from "../seating.js";
@@ -12,15 +12,17 @@ import type { LogLine, PickOne } from "../state/useGame.js";
 export type TableProps = {
   view: GameView;
   me: PlayerId;
-  snapArmed: boolean;
-  snapPending: boolean;
+  slapArmed: boolean;
+  slapPending: boolean;
+  /** True while something is covering the table - the rule book - so its keys stand down. */
+  keysHeld: boolean;
   /** Set while a fresh hand is on its way out to the seats. */
   dealing: boolean;
   pick: PickOne;
   log: LogLine[];
   act: (action: Action) => void;
-  snap: (targetId: PlayerId, slot: number) => void;
-  armSnap: (armed: boolean) => void;
+  slap: (targetId: PlayerId, slot: number) => void;
+  armSlap: (armed: boolean) => void;
   setPick: (pick: PickOne) => void;
   revealFor: (ownerId: PlayerId, slot: number) => Card | null;
   flashFor: (ownerId: PlayerId, slot: number) => Flash | null;
@@ -28,48 +30,52 @@ export type TableProps = {
   onLeave: () => void;
 };
 
-type SlotState = "idle" | "targetable" | "selected" | "snap";
+type SlotState = "idle" | "targetable" | "selected" | "slap";
 
 export function Table(props: TableProps): React.JSX.Element {
-  const { view, me, snapArmed, snapPending, dealing, pick, log, act, snap, armSnap, setPick } = props;
+  const { view, me, slapArmed, slapPending, keysHeld, dealing, pick, log, act, slap, armSlap, setPick } = props;
   const { revealFor, flashFor, pileFlash, onLeave } = props;
 
   const myTurn = view.turnPlayerId === me;
   const mySeat = view.players.find((p) => p.id === me);
   const ownSlots = mySeat?.slots.length ?? 0;
-  const iOweACard = view.snapDebt?.snapperId === me;
+  const iOweACard = view.slapDebt?.slapperId === me;
   /** A card drawn from the deck can be thrown away - from the button or the pile. */
   const canDiscardDrawn = myTurn && view.phase === "holdingCard" && !view.heldFromDiscard;
 
   /**
-   * Keyboard is the fast path that makes the race winnable: S arms snapping and
-   * the number keys snap your own cards outright, with no second click.
+   * Keyboard is the fast path that makes the race winnable: S arms slapping and
+   * the number keys slap your own cards outright, with no second click.
+   *
+   * Which is exactly why they go quiet while the rule book is open. A player
+   * reading about slapping is not making one, and a keystroke there must not
+   * cost them a card.
    */
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.target instanceof HTMLInputElement) return;
+      if (event.target instanceof HTMLInputElement || keysHeld) return;
 
       if (event.key === "Escape") {
-        armSnap(false);
+        armSlap(false);
         setPick(null);
         return;
       }
       if (event.key === "s" || event.key === "S") {
-        if (view.snapOpen) armSnap(!snapArmed);
+        if (view.slapOpen) armSlap(!slapArmed);
         return;
       }
       const digit = Number.parseInt(event.key, 10);
-      if (!Number.isNaN(digit) && digit >= 1 && digit <= ownSlots && view.snapOpen) {
-        snap(me, digit - 1);
+      if (!Number.isNaN(digit) && digit >= 1 && digit <= ownSlots && view.slapOpen) {
+        slap(me, digit - 1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view.snapOpen, snapArmed, ownSlots, me, armSnap, setPick, snap]);
+  }, [view.slapOpen, slapArmed, keysHeld, ownSlots, me, armSlap, setPick, slap]);
 
   /** What clicking a given slot would mean right now. */
   const slotState = (ownerId: PlayerId, slot: number): SlotState => {
-    if (snapArmed && view.snapOpen) return "snap";
+    if (slapArmed && view.slapOpen) return "slap";
     const mine = ownerId === me;
 
     if (pick !== null && pick.ownerId === ownerId && pick.slot === slot) return "selected";
@@ -80,7 +86,7 @@ export function Table(props: TableProps): React.JSX.Element {
       const studiable = isInitialPeekSlot(slot, mySeat.slots.length, INITIAL_PEEKS);
       return studiable && !mySeat.peeked.includes(slot) ? "targetable" : "idle";
     }
-    if (view.phase === "snapGiveCard") return iOweACard && mine ? "targetable" : "idle";
+    if (view.phase === "slapGiveCard") return iOweACard && mine ? "targetable" : "idle";
     if (!myTurn) return "idle";
 
     switch (view.phase) {
@@ -114,8 +120,8 @@ export function Table(props: TableProps): React.JSX.Element {
   };
 
   const onSlot = (ownerId: PlayerId, slot: number): void => {
-    if (snapArmed && view.snapOpen) {
-      snap(ownerId, slot);
+    if (slapArmed && view.slapOpen) {
+      slap(ownerId, slot);
       return;
     }
     const mine = ownerId === me;
@@ -124,8 +130,8 @@ export function Table(props: TableProps): React.JSX.Element {
       act({ a: "initialPeek", slot });
       return;
     }
-    if (view.phase === "snapGiveCard") {
-      if (iOweACard && mine) act({ a: "snapGive", slot });
+    if (view.phase === "slapGiveCard") {
+      if (iOweACard && mine) act({ a: "slapGive", slot });
       return;
     }
     if (!myTurn) return;
@@ -182,7 +188,7 @@ export function Table(props: TableProps): React.JSX.Element {
             canDrawDeck={myTurn && view.phase === "awaitingAction"}
             canDrawDiscard={myTurn && view.phase === "awaitingAction" && view.discardTop !== null}
             canDiscardDrawn={canDiscardDrawn}
-            snapArmed={snapArmed}
+            slapArmed={slapArmed}
             deckMoved={pileFlash("deck")}
             discardMoved={pileFlash("discard")}
             onDrawDeck={() => act({ a: "drawDeck" })}
@@ -224,12 +230,12 @@ export function Table(props: TableProps): React.JSX.Element {
       </div>
 
       <footer className="table__controls">
-        <SnapBar
-          open={view.snapOpen}
-          armed={snapArmed}
-          pending={snapPending}
+        <SlapBar
+          open={view.slapOpen}
+          armed={slapArmed}
+          pending={slapPending}
           ownSlots={ownSlots}
-          onArm={armSnap}
+          onArm={armSlap}
         />
 
         <div className="table__buttons">
@@ -310,8 +316,8 @@ function prompt(view: GameView, me: PlayerId, pick: PickOne, iOweACard: boolean)
       ? "Waiting for the others to finish studying..."
       : "Look at your two bottom cards, then hit Ready";
   }
-  if (view.phase === "snapGiveCard") {
-    const owed = view.players.find((p) => p.id === view.snapDebt?.targetId)?.name ?? "them";
+  if (view.phase === "slapGiveCard") {
+    const owed = view.players.find((p) => p.id === view.slapDebt?.targetId)?.name ?? "them";
     return iOweACard ? `Pick a card to give ${owed}` : "Waiting for a card to change hands...";
   }
   if (view.turnPlayerId !== me) {

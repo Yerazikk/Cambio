@@ -6,7 +6,7 @@ export type SeatProps = {
   placement: Placement;
   isTurn: boolean;
   /** Which slots can be clicked right now, and what the click means. */
-  targetable: (slot: number) => "idle" | "targetable" | "selected" | "snap";
+  targetable: (slot: number) => "idle" | "targetable" | "selected" | "slap";
   onSlot: (slot: number) => void;
   /** A transient peek, if this player's slot is currently face up for us. */
   revealFor: (ownerId: PlayerId, slot: number) => Card | null;

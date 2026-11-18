@@ -9,9 +9,9 @@ export type RoomCode = string;
  * Game actions. Every one of these is fed to the pure reducer, so this union is
  * exactly the rule surface the engine tests enumerate.
  *
- * `snap` is the one exception: the socket layer intercepts it, hands it to the
- * arbiter to win or lose the race, and only the resolved outcome reaches the
- * reducer as `snapResolve`.
+ * `slap` is the one exception: the socket layer intercepts it, hands it to the
+ * arbiter to put it in the queue, and only the resolved outcome reaches the
+ * reducer as `slapResolve` - once per slap that actually gets its turn.
  */
 export type Action =
   /* turn start */
@@ -36,14 +36,17 @@ export type Action =
   /* pre-round study phase */
   | { a: "initialPeek"; slot: number }
   | { a: "readyUp" }
-  /* snap */
-  | { a: "snap"; targetId: PlayerId; slot: number }
-  | { a: "snapGive"; slot: number };
+  /* slap */
+  | { a: "slap"; targetId: PlayerId; slot: number }
+  | { a: "slapGive"; slot: number };
 
-/** Emitted by the arbiter, never sent by a client. */
+/**
+ * Emitted by the arbiter, never sent by a client. One of these is fed to the
+ * reducer for each slap the queue actually reaches.
+ */
 export type ResolvedAction = {
-  a: "snapResolve";
-  winnerId: PlayerId | null;
+  a: "slapResolve";
+  slapperId: PlayerId;
   targetId: PlayerId;
   slot: number;
   marginMs: number | null;
@@ -81,7 +84,7 @@ export type Phase =
   | "powerPeekOther"
   | "powerFreeSwap"
   | "powerKing"
-  | "snapGiveCard"
+  | "slapGiveCard"
   | "finished";
 
 /**
@@ -155,12 +158,12 @@ export type GameView = {
    * mid-power does not lose track of where the turn is.
    */
   kingPeeked: boolean;
-  /** Who owes whom a card after snapping someone else's. */
-  snapDebt: { snapperId: PlayerId; targetId: PlayerId } | null;
+  /** Who owes whom a card after slapping someone else's. */
+  slapDebt: { slapperId: PlayerId; targetId: PlayerId } | null;
   /** Non-null once someone calls Cambio: how many final turns remain. */
   finalTurnsRemaining: number | null;
-  /** Whether a snap is legal right now. */
-  snapOpen: boolean;
+  /** Whether a slap is legal right now. */
+  slapOpen: boolean;
   winnerId: PlayerId | null;
 };
 
@@ -188,18 +191,23 @@ export type TableEventKind =
   | "peek"
   /** Two cards changed places. */
   | "swap"
-  /** A card moved from one hand to another to settle a snap. */
+  /** A card moved from one hand to another to settle a slap. */
   | "give"
-  /** A card was dealt into a hand as a penalty for a wrong snap. */
+  /** A card was dealt into a hand as a penalty for a wrong slap. */
   | "penalty"
   /** Cambio was called. */
   | "cambio";
 
-export type SnapOutcome =
+export type SlapOutcome =
+  /** The slap was right, and the card was the slapper's own. */
   | "ownCardDiscarded"
+  /** The slap was right, and the card belonged to someone else. */
   | "otherCardDiscarded"
+  /** The slap was wrong. The slapper took a card, and the queue moves on. */
   | "wrongRankPenalty"
+  /** An earlier slap in the queue was right, so this one never had to be played. */
   | "lostRace"
+  /** The card or the discard top was gone by the time the queue reached it. */
   | "noLongerValid";
 
 export type ErrorCode =
@@ -226,13 +234,24 @@ export type ServerEvent =
    * which is what keeps Cambio a memory game.
    */
   | { t: "card.revealed"; ownerId: PlayerId; slot: number; card: Card; ttlMs: number }
+  /**
+   * One slap, settled. A contested race produces several of these, in queue
+   * order, because every slap is played out until one of them is right.
+   */
   | {
-      t: "snap.resolved";
-      winnerId: PlayerId | null;
+      t: "slap.resolved";
+      /** Whose slap this is. */
+      slapperId: PlayerId;
       targetId: PlayerId;
       slot: number;
-      outcome: SnapOutcome;
-      /** How far ahead the winner was, in compensated ms. */
+      outcome: SlapOutcome;
+      /** On `lostRace`, whose correct slap ended the queue. Null otherwise. */
+      endedById: PlayerId | null;
+      /**
+       * For the first slap in the queue, how far ahead of the next one it
+       * landed, in compensated ms - null if it was unopposed. For every slap
+       * after it, how far behind the first one it landed.
+       */
       marginMs: number | null;
     }
   /**

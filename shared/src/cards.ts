@@ -62,7 +62,7 @@ export function cardLabel(card: Card): string {
 }
 
 /**
- * Snap legality. Two cards match on rank alone — suit is irrelevant, and two
+ * Slap legality. Two cards match on rank alone — suit is irrelevant, and two
  * jokers match each other.
  */
 export function ranksMatch(a: Rank, b: Rank): boolean {

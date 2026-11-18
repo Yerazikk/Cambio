@@ -5,7 +5,7 @@ import { RTT_DEFAULT_MS, RTT_EWMA_ALPHA, RTT_MAX_COMPENSATION_MS, type PlayerId 
  *
  * The server sends a nonce and times the echo, so the only input to latency
  * compensation is something the server observed. A client cannot claim to be
- * slower than it is to buy itself an earlier effective snap time, because it
+ * slower than it is to buy itself an earlier effective slap time, because it
  * never reports a clock at all.
  */
 export class RttTracker {
@@ -43,7 +43,7 @@ export class RttTracker {
   }
 
   /**
-   * How far back to credit a player's snap. Capped so that an unusually bad or
+   * How far back to credit a player's slap. Capped so that an unusually bad or
    * misreported-looking RTT cannot be turned into an arbitrarily large head
    * start.
    */

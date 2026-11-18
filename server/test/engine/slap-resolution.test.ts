@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SnapOutcome } from "@cambio/shared";
+import type { SlapOutcome } from "@cambio/shared";
 import { reduce, type ReduceCtx } from "../../src/engine/reduce.js";
 import type { GameState } from "../../src/engine/state.js";
 import { mulberry32 } from "../../src/rng.js";
@@ -7,7 +7,7 @@ import { fixture } from "../helpers.js";
 
 const ctx: ReduceCtx = { now: 2_000, rng: mulberry32(9) };
 
-/** The discard top is a five, so any five in a hand is a legal snap target. */
+/** The discard top is a five, so any five in a hand is a legal slap target. */
 function table(): GameState {
   return fixture({
     hands: { ana: ["S5", "S2", "S3"], bo: ["C5", "C7", "C8"], cy: ["D9", "D10"] },
@@ -18,23 +18,23 @@ function table(): GameState {
 
 function resolve(
   state: GameState,
-  winnerId: string | null,
+  slapperId: string,
   targetId: string,
   slot: number,
   marginMs: number | null = 12,
 ) {
-  const result = reduce(state, winnerId ?? "ana", { a: "snapResolve", winnerId, targetId, slot, marginMs }, ctx);
+  const result = reduce(state, slapperId, { a: "slapResolve", slapperId, targetId, slot, marginMs }, ctx);
   if (!result.ok) throw new Error(`${result.code}: ${result.message}`);
-  const event = result.out.find((o) => o.event.t === "snap.resolved")?.event;
-  if (event?.t !== "snap.resolved") throw new Error("no snap.resolved event was emitted");
+  const event = result.out.find((o) => o.event.t === "slap.resolved")?.event;
+  if (event?.t !== "slap.resolved") throw new Error("no slap.resolved event was emitted");
   return { state: result.state, event, out: result.out };
 }
 
-function outcomeOf(state: GameState, winnerId: string | null, targetId: string, slot: number): SnapOutcome {
-  return resolve(state, winnerId, targetId, slot).event.outcome;
+function outcomeOf(state: GameState, slapperId: string, targetId: string, slot: number): SlapOutcome {
+  return resolve(state, slapperId, targetId, slot).event.outcome;
 }
 
-describe("snapping your own card", () => {
+describe("slapping your own card", () => {
   it("discards it and shrinks your hand", () => {
     const { state, event } = resolve(table(), "ana", "ana", 0);
 
@@ -43,11 +43,11 @@ describe("snapping your own card", () => {
     expect(state.discard).toEqual(["H5", "S5"]);
   });
 
-  it("broadcasts the result to everyone, with the winning margin", () => {
+  it("broadcasts the result to everyone, with the margin", () => {
     const { event, out } = resolve(table(), "ana", "ana", 0, 15);
 
     expect(out.every((o) => o.to === "all")).toBe(true);
-    expect(event.winnerId).toBe("ana");
+    expect(event.slapperId).toBe("ana");
     expect(event.marginMs).toBe(15);
   });
 
@@ -67,56 +67,56 @@ describe("snapping your own card", () => {
   });
 });
 
-describe("snapping someone else's card", () => {
+describe("slapping someone else's card", () => {
   it("discards their card and leaves you owing them one", () => {
     const { state, event } = resolve(table(), "ana", "bo", 0);
 
     expect(event.outcome).toBe("otherCardDiscarded");
     expect(state.seats[1]?.hand).toEqual(["C7", "C8"]);
     expect(state.discard).toEqual(["H5", "C5"]);
-    expect(state.phase).toBe("snapGiveCard");
-    expect(state.snapGiveFor).toEqual({ snapperId: "ana", targetId: "bo" });
+    expect(state.phase).toBe("slapGiveCard");
+    expect(state.slapGiveFor).toEqual({ slapperId: "ana", targetId: "bo" });
   });
 
   it("hands over the card you choose and resumes play", () => {
-    const snapped = resolve(table(), "ana", "bo", 0).state;
-    const result = reduce(snapped, "ana", { a: "snapGive", slot: 1 }, ctx);
+    const slapped = resolve(table(), "ana", "bo", 0).state;
+    const result = reduce(slapped, "ana", { a: "slapGive", slot: 1 }, ctx);
     if (!result.ok) throw new Error(result.message);
 
     expect(result.state.seats[0]?.hand).toEqual(["S5", "S3"]);
     expect(result.state.seats[1]?.hand).toEqual(["C7", "C8", "S2"]);
-    expect(result.state.snapGiveFor).toBeNull();
+    expect(result.state.slapGiveFor).toBeNull();
     expect(result.state.phase).toBe("awaitingAction");
   });
 
   it("will not let anyone else pay the debt", () => {
-    const snapped = resolve(table(), "ana", "bo", 0).state;
-    const result = reduce(snapped, "cy", { a: "snapGive", slot: 0 }, ctx);
+    const slapped = resolve(table(), "ana", "bo", 0).state;
+    const result = reduce(slapped, "cy", { a: "slapGive", slot: 0 }, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("illegalAction");
   });
 
   it("blocks further play until the debt is paid", () => {
-    const snapped = resolve(table(), "ana", "bo", 0).state;
-    const result = reduce(snapped, "ana", { a: "drawDeck" }, ctx);
+    const slapped = resolve(table(), "ana", "bo", 0).state;
+    const result = reduce(slapped, "ana", { a: "drawDeck" }, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("illegalAction");
   });
 
-  it("returns the table to the phase the snap interrupted", () => {
-    // Ana is mid-turn holding a card when the snap lands.
+  it("returns the table to the phase the slap interrupted", () => {
+    // Ana is mid-turn holding a card when the slap lands.
     let state = table();
     const drawn = reduce(state, "ana", { a: "drawDeck" }, ctx);
     if (!drawn.ok) throw new Error(drawn.message);
     state = drawn.state;
     expect(state.phase).toBe("holdingCard");
 
-    const snapped = resolve(state, "cy", "bo", 0).state;
-    expect(snapped.phase).toBe("snapGiveCard");
+    const slapped = resolve(state, "cy", "bo", 0).state;
+    expect(slapped.phase).toBe("slapGiveCard");
 
-    const paid = reduce(snapped, "cy", { a: "snapGive", slot: 0 }, ctx);
+    const paid = reduce(slapped, "cy", { a: "slapGive", slot: 0 }, ctx);
     if (!paid.ok) throw new Error(paid.message);
 
     // Ana is still holding her card and still owns the turn.
@@ -130,8 +130,8 @@ describe("snapping someone else's card", () => {
       discard: ["H5"],
       deck: ["S3"],
     });
-    const snapped = resolve(state, "ana", "bo", 0).state;
-    const result = reduce(snapped, "ana", { a: "snapGive", slot: 0 }, ctx);
+    const slapped = resolve(state, "ana", "bo", 0).state;
+    const result = reduce(slapped, "ana", { a: "slapGive", slot: 0 }, ctx);
     if (!result.ok) throw new Error(result.message);
 
     expect(result.state.seats[0]?.hand).toEqual([]);
@@ -139,7 +139,7 @@ describe("snapping someone else's card", () => {
   });
 });
 
-describe("snapping the wrong card", () => {
+describe("slapping the wrong card", () => {
   it("costs you a penalty card off the deck", () => {
     const { state, event } = resolve(table(), "ana", "ana", 1); // S2 against a five
 
@@ -162,11 +162,11 @@ describe("snapping the wrong card", () => {
   });
 
   it("matches on rank alone, ignoring suit", () => {
-    // C5 is a different suit from the H5 on the discard, and still a legal snap.
+    // C5 is a different suit from the H5 on the discard, and still a legal slap.
     expect(outcomeOf(table(), "bo", "bo", 0)).toBe("ownCardDiscarded");
   });
 
-  it("lets a joker snap a joker but nothing else", () => {
+  it("lets a joker slap a joker but nothing else", () => {
     const jokers = fixture({
       hands: { ana: ["X0", "S2"], bo: ["S13", "C3"] },
       discard: ["X1"],
@@ -178,17 +178,9 @@ describe("snapping the wrong card", () => {
   });
 });
 
-describe("races nobody won", () => {
-  it("reports a null winner as void", () => {
-    const { state, event } = resolve(table(), null, "ana", 0);
-
-    expect(event.outcome).toBe("noLongerValid");
-    expect(event.winnerId).toBeNull();
-    expect(state.seats[0]?.hand).toEqual(["S5", "S2", "S3"]); // nothing moved
-  });
-
-  it("voids a snap at a slot that no longer exists", () => {
-    // Two snaps can be in flight at once; the second may target a gap the first
+describe("slaps that are no longer playable", () => {
+  it("voids a slap at a slot that no longer exists", () => {
+    // Two slaps can be in flight at once; the second may target a gap the first
     // already created.
     const afterFirst = resolve(table(), "ana", "ana", 0).state;
     const { state, event } = resolve(afterFirst, "cy", "ana", 5);
@@ -197,11 +189,11 @@ describe("races nobody won", () => {
     expect(state.seats[2]?.hand).toEqual(["D9", "D10"]);
   });
 
-  it("voids a snap from a player who is no longer seated", () => {
+  it("voids a slap from a player who is no longer seated", () => {
     expect(outcomeOf(table(), "ghost", "ana", 0)).toBe("noLongerValid");
   });
 
-  it("voids a snap against an empty discard pile", () => {
+  it("voids a slap against an empty discard pile", () => {
     const empty = fixture({
       hands: { ana: ["S5"], bo: ["C5"] },
       discard: [],
@@ -211,13 +203,41 @@ describe("races nobody won", () => {
   });
 });
 
-describe("the losers of a race", () => {
-  it("are not penalised - only the winning snap is applied", () => {
-    // Ana wins the race; Bo's simultaneous snap simply never reaches the
-    // reducer, so Bo's hand is untouched.
+describe("playing a queue of slaps out in order", () => {
+  it("touches only the slapper and the target, never anyone else", () => {
+    // One slap is one slap: Bo, who also slapped, is not touched by Ana's.
     const { state } = resolve(table(), "ana", "ana", 0);
 
     expect(state.seats[1]?.hand).toEqual(["C5", "C7", "C8"]);
-    expect(state.seats[1]?.hand).toHaveLength(3);
+  });
+
+  it("lets the next slapper have their go after a wrong one", () => {
+    // Ana slaps her two against a five and takes a penalty. The discard top is
+    // untouched, so Bo's five behind her is still a legal slap.
+    const first = resolve(table(), "ana", "ana", 1);
+    expect(first.event.outcome).toBe("wrongRankPenalty");
+    expect(first.state.discard).toEqual(["H5"]);
+
+    const second = resolve(first.state, "bo", "bo", 0);
+    expect(second.event.outcome).toBe("ownCardDiscarded");
+    expect(second.state.seats[1]?.hand).toEqual(["C7", "C8"]);
+    // Ana still carries the card her wrong slap cost her.
+    expect(second.state.seats[0]?.hand).toEqual(["S5", "S2", "S3", "S12"]);
+  });
+
+  it("penalises every wrong slapper in turn when nobody is right", () => {
+    let state = table();
+    for (const [slapper, slot] of [
+      ["ana", 1],
+      ["bo", 1],
+    ] as const) {
+      const played = resolve(state, slapper, slapper, slot);
+      expect(played.event.outcome).toBe("wrongRankPenalty");
+      state = played.state;
+    }
+
+    expect(state.seats[0]?.hand).toHaveLength(4);
+    expect(state.seats[1]?.hand).toHaveLength(4);
+    expect(state.discard).toEqual(["H5"]);
   });
 });

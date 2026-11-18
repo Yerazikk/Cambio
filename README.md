@@ -1,10 +1,13 @@
 # Cambio
 
 A real-time, server-authoritative implementation of Cambio — the card game where
-the lowest hand wins, you don't know your own cards, and snapping a match is a
+the lowest hand wins, you don't know your own cards, and slapping a match is a
 race decided in milliseconds.
 
 ## The game
+
+The full rule book is [`docs/RULES.md`](docs/RULES.md); what follows is the
+short version.
 
 Four cards each, dealt face down and laid out two by two. You may study your
 bottom two before the first turn, and after that remembering them is your
@@ -25,7 +28,7 @@ A card taken from the discard pile grants no power — it must go into your hand
 Powers are optional; you may decline one.
 
 **Decks.** The host picks one, two, or three packs before the round starts. More
-packs means more of every rank on the table, so snaps come up far more often.
+packs means more of every rank on the table, so slaps come up far more often.
 
 **Cards.** The host also picks the back the table plays with. It is purely
 cosmetic - every card wears the same one, so it gives nothing away - and it can
@@ -36,10 +39,15 @@ be changed at any point, mid-round included. The artwork lives in
 **Scoring.** `A` = 1, pips at face value, `J`/`Q` = 10, a black `K` = 13, a red
 `K` = **-1**, and jokers = 0. The deck is 54 cards.
 
-**Snapping.** At any time, if a card in any hand matches the rank of the discard
-top, you can snap it. Hit your own and it leaves your hand. Hit someone else's
+**Slapping.** At any time, if a card in any hand matches the rank of the discard
+top, you can slap it. Hit your own and it leaves your hand. Hit someone else's
 and theirs is discarded, but you owe them one of yours. Get the rank wrong and
 you take a penalty card. Empty your hand and the round ends on the spot.
+
+Slapping at the same moment as somebody else is a queue, not a duel: a faster
+slap does not cancel a slower one, it only goes first. If the slap ahead of
+yours was right, the queue stops there and yours costs you nothing. If it was
+wrong, the slapper takes their penalty and yours is played out next.
 
 **Calling Cambio.** Instead of drawing, call Cambio. Everyone else takes one
 final turn, then all hands are revealed. Lowest total wins, and the caller wins
@@ -66,7 +74,7 @@ can grow without crowding its neighbour.
 The table is white: paper for the surface, ink for everything you read, and a
 hairline wherever a lesser screen would put a box. The only coloured things on
 it are the cards, and the four marks that mean something - brass for whose turn
-it is, green for a card you have chosen, blue for a trade, red for a snap.
+it is, green for a card you have chosen, blue for a trade, red for a slap.
 
 A card is an object with two sides rather than two pieces of markup. Face up or
 face down is one class on its frame, and inside the frame the two faces sit back
@@ -94,7 +102,7 @@ broadcast in public terms and animates on every screen at the same moment:
 | Both ends of a swap flip and settle | You watch the two cards cross |
 | A drawn card appear at a player's seat | You watch it leave the pile |
 | The face of a card taken off the discard | It was face up on the way out |
-| The snapped card shake, red | Someone slapped the table |
+| The slapped card shake, red | Someone slapped the table |
 
 What is never sent is the face of a card the viewer has not earned. The server
 announces the gesture and the slots it landed on - `{ kind, byId, slots }` - and
@@ -103,36 +111,45 @@ at and still have no idea what it was. Remembering it is their problem, and
 remembering that they looked is yours. A running log in the corner of the felt
 names the last few moves in words, for the half-second after one lands.
 
-## How a snap race is decided
+## How a slap race is decided
 
-Snapping is the only part of the game where latency could decide the outcome, so
+Slapping is the only part of the game where latency could decide the outcome, so
 it is not resolved first-packet-wins.
 
 The server probes each client with a nonce and times the echo itself, keeping an
 EWMA of the round trip. The client never reports a clock, so there is nothing to
-misreport. When the first snap lands, a 200ms window opens; every snap arriving
-inside it joins the same race, and the winner is the earliest
-`arrival − rtt / 2`:
+misreport. When the first slap lands, a 200ms window opens; every slap arriving
+inside it joins the same queue, ordered by the earliest `arrival − rtt / 2`:
 
 ```
-first snap arrives -> open 200ms window
+first slap arrives -> open 200ms window
 
-  Ana   arrival 1000ms  rtt 40ms  -> 980
-  Bo    arrival 1010ms  rtt 90ms  -> 965   <- WINS
-  Cy    arrival 1180ms  rtt 30ms  -> 1165
+  Ana   arrival 1000ms  rtt 40ms  -> 980    2nd in the queue
+  Bo    arrival 1010ms  rtt 90ms  -> 965    1st in the queue
+  Cy    arrival 1180ms  rtt 30ms  -> 1165   3rd in the queue
 ```
 
 Bo's packet landed later but Bo hit the table first. Ties break on raw arrival
-and then on player id, so the result never depends on map iteration order and
-every client is told the same winner. Compensation is capped at 150ms so an
+and then on player id, so the order never depends on map iteration order and
+every client is told the same thing. Compensation is capped at 150ms so an
 extreme round trip cannot buy an arbitrary head start.
 
-The client flashes the snap locally the instant you click, then reconciles to
-the authoritative result — including a toast naming the winner and the margin.
+The queue is then played out in order rather than collapsed to a single winner.
+Bo's slap goes first; if it was right the queue stops there and Ana and Cy keep
+their cards, and if it was wrong Bo takes a penalty and Ana's slap is played
+next. A wrong slap discards nothing, so the top of the pile is unchanged and
+the slap behind it is judged against the same card — which is exactly why a
+right slap, which *does* change the top, has to end the queue.
+
+The client flashes the slap locally the instant you click, then reconciles to
+the authoritative result — including a toast for each slap that was played out,
+and a private one telling you when yours never had to be.
 
 ## Architecture
 
 ```
+docs/RULES.md      the rule book, as the engine and the help screen play it
+
 shared/src/        the protocol both sides compile against
   protocol.ts        ClientMsg | ServerEvent, the view types
   cards.ts           card model, scoring, powers
@@ -142,7 +159,7 @@ server/src/
   engine/reduce.ts   the entire rule surface, as one pure function
   engine/state.ts    authoritative state + per-player view redaction
   engine/score.ts    hand scoring and round settlement
-  snap.ts            the latency-compensated race
+  slap.ts            the latency-compensated queue
   rtt.ts             server-measured round-trip times
   rooms.ts           rooms, seats, session tokens, timers
   gateway.ts         sockets <-> room manager
@@ -150,9 +167,9 @@ server/src/
 
 client/src/
   screens/           Home, Lobby, Table, GameOver
-  components/        Card, Seat, Piles, SnapBar, TableLog, Toasts, TurnClock
+  components/        Card, Seat, Piles, SlapBar, RulesHelp, TableLog, Toasts, TurnClock
   seating.ts         where each player sits, as one formula
-  state/useGame.ts   view, transient peeks, move animations, snap arming
+  state/useGame.ts   view, transient peeks, move animations, slap arming
   net/socket.ts      typed client with auto-reconnect
 ```
 
@@ -239,29 +256,31 @@ npm run typecheck
 - **Unit** — the deck and scoring, then the reducer against the whole rule
   surface: each power, `knownBy` correctness through swaps, Cambio sequencing
   and ties, deck-exhaustion reshuffles, and every illegal move.
-- **Snap arbiter** — the race as pure ordering, plus RTT measurement: the
+- **Slap arbiter** — the queue as pure ordering, plus RTT measurement: the
   headline later-but-lower-ping case, the window boundary to the millisecond,
-  deterministic tie-breaks, and the compensation cap.
+  deterministic tie-breaks, the one-slap-per-player rule, and the compensation
+  cap.
 - **Integration** — a real server and real sockets: join, kick, token
   revocation, host migration, refresh mid-game, grace expiry, a full round to
   scoring, latency-compensated races driven by delayed pongs, and the
   hidden-information leak assertion.
-- **E2E** — 40 tests in real browsers, one context per player: lobby and kick, a
+- **E2E** — 46 tests in real browsers, one context per player: lobby and kick, a
   reload mid-game, a round played entirely by clicking, playing again,
-  two browsers racing a snap with one of them throttled, asserting the whole
-  table agrees on the winner, and the shared view of the table - that each
+  two browsers racing a slap with one of them throttled, asserting that every
+  slap is played out and the whole table agrees on the order, and the shared
+  view of the table - that each
   player sits in their own bottom seat with the others round them in order, and
   that a move animates on the other player's screen without its face going with
   it.
 
 Determinism is built in: the deck takes an injected seeded RNG, the reducer
-takes `now`, and the snap arbiter takes a clock and a scheduler, so a failing
+takes `now`, and the slap arbiter takes a clock and a scheduler, so a failing
 race replays exactly instead of flaking.
 
 ## Configuration
 
 Every rule and timing is a constant in `shared/src/rules.ts` — hand size,
-initial peeks, the snap window, the peek duration, the turn clock, the Cambio
+initial peeks, the slap window, the peek duration, the turn clock, the Cambio
 penalty, reconnect grace, and the RTT cap.
 
 One is worth calling out. `SERVER_REMEMBERS_PEEKS` is `false`: a peek is shown

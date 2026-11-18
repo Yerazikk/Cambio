@@ -9,7 +9,7 @@ import type { SeatReport } from "./DevSeat.js";
  * Every pane is a real client - its own document, its own socket, its own
  * session token - so what you are looking at is exactly what several people on
  * several machines would see, including the things that only go wrong between
- * clients: a move that animates on one screen and not another, a snap race, a
+ * clients: a move that animates on one screen and not another, a slap race, a
  * view that arrives out of order, a seat that drops and comes back.
  *
  * The first pane creates the table and reports the code upward; the rest join

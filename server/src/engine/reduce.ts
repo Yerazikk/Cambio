@@ -8,6 +8,7 @@ import {
   type PlayerId,
   type Power,
   type ServerEvent,
+  type SlapOutcome,
   type SlotRef,
   type TableEventKind,
 } from "@cambio/shared";
@@ -55,10 +56,10 @@ function applyAction(
   const state = structuredClone(prev);
   const out: Outbound[] = [];
 
-  // The arbiter speaks for the system rather than for a player, and names its
-  // winner in the payload, so this is settled before any actor check. A winner
-  // who has since left the table is voided inside resolveSnap.
-  if (action.a === "snapResolve") return resolveSnap(state, out, ctx, action);
+  // The arbiter speaks for the system rather than for a player, and names the
+  // slapper in the payload, so this is settled before any actor check. A
+  // slapper who has since left the table is voided inside resolveSlap.
+  if (action.a === "slapResolve") return resolveSlap(state, out, ctx, action);
 
   const actor = seatOf(state, actorId);
   if (!actor) return fail("sessionInvalid", "you are not seated at this table");
@@ -268,22 +269,22 @@ function applyAction(
       return { ok: true, state, out };
     }
 
-    /* --------------------------------------------------------- snapping */
+    /* --------------------------------------------------------- slapping */
 
-    case "snap": {
-      // Snaps never reach the reducer directly: the arbiter races them first and
-      // feeds back a single `snapResolve`.
-      return fail("illegalAction", "snaps are resolved by the arbiter");
+    case "slap": {
+      // Slaps never reach the reducer directly: the arbiter orders them first
+      // and feeds back a `slapResolve` for each one the queue reaches.
+      return fail("illegalAction", "slaps are resolved by the arbiter");
     }
 
-    case "snapGive": {
-      if (state.phase !== "snapGiveCard" || state.snapGiveFor === null) {
+    case "slapGive": {
+      if (state.phase !== "slapGiveCard" || state.slapGiveFor === null) {
         return fail("illegalAction", "you do not owe anyone a card");
       }
-      if (state.snapGiveFor.snapperId !== actorId) {
+      if (state.slapGiveFor.slapperId !== actorId) {
         return fail("illegalAction", "you are not the player who owes a card");
       }
-      const target = seatOf(state, state.snapGiveFor.targetId);
+      const target = seatOf(state, state.slapGiveFor.targetId);
       if (!target) return fail("badTarget", "no such player");
       const cardId = actor.hand[action.slot];
       if (cardId === undefined) return fail("badSlot", `you have no slot ${action.slot}`);
@@ -293,9 +294,9 @@ function applyAction(
       // The card's new home is what everyone needs to see; the slot it left
       // no longer exists, since the rest of the hand has closed up behind it.
       announce(out, "give", actorId, [{ ownerId: target.id, slot: target.hand.length - 1 }]);
-      state.snapGiveFor = null;
-      // The snap interrupted a turn in progress; put the table back where it was.
-      state.phase = phaseAfterSnapGive(state);
+      state.slapGiveFor = null;
+      // The slap interrupted a turn in progress; put the table back where it was.
+      state.phase = phaseAfterSlapGive(state);
 
       if (actor.hand.length === 0) finishRound(state, out);
       return { ok: true, state, out };
@@ -385,46 +386,47 @@ function applySwap(
   return { ok: true, state, out };
 }
 
-function resolveSnap(
+/**
+ * Play out one slap.
+ *
+ * The arbiter feeds these in queue order and stops at the first that lands, so
+ * this only ever sees a slap it is genuinely that player's turn to make.
+ */
+function resolveSlap(
   state: GameState,
   out: Outbound[],
   ctx: ReduceCtx,
-  action: Extract<EngineAction, { a: "snapResolve" }>,
+  action: Extract<EngineAction, { a: "slapResolve" }>,
 ): ReduceResult {
-  const { winnerId, targetId, slot, marginMs } = action;
+  const { slapperId, targetId, slot, marginMs } = action;
+  const resolved = (outcome: SlapOutcome): Outbound => ({
+    to: "all",
+    event: { t: "slap.resolved", slapperId, targetId, slot, outcome, endedById: null, marginMs },
+  });
 
-  const voided = (): ReduceResult => {
-    out.push({
-      to: "all",
-      event: { t: "snap.resolved", winnerId, targetId, slot, outcome: "noLongerValid", marginMs },
-    });
-    return { ok: true, state, out };
-  };
-
-  if (winnerId === null) return voided();
-
-  const winner = seatOf(state, winnerId);
+  const slapper = seatOf(state, slapperId);
   const target = seatOf(state, targetId);
   const top = discardTopCard(state);
   const cardId = target?.hand[slot];
   const card = cardId === undefined ? undefined : state.cards.get(cardId);
 
-  if (!winner || !target || !top || cardId === undefined || card === undefined) return voided();
+  if (!slapper || !target || !top || cardId === undefined || card === undefined) {
+    out.push(resolved("noLongerValid"));
+    return { ok: true, state, out };
+  }
 
   if (card.rank !== top.rank) {
-    // A wrong snap costs you a card off the deck, face down - you do not even
-    // get to see what you were given.
+    // A wrong slap costs you a card off the deck, face down - you do not even
+    // get to see what you were given - and hands the slap on to whoever is
+    // next in the queue.
     if (refillDeckIfEmpty(state, ctx)) {
       const penalty = state.deck.pop();
       if (penalty !== undefined) {
-        winner.hand.push(penalty);
-        announce(out, "penalty", winnerId, [{ ownerId: winnerId, slot: winner.hand.length - 1 }]);
+        slapper.hand.push(penalty);
+        announce(out, "penalty", slapperId, [{ ownerId: slapperId, slot: slapper.hand.length - 1 }]);
       }
     }
-    out.push({
-      to: "all",
-      event: { t: "snap.resolved", winnerId, targetId, slot, outcome: "wrongRankPenalty", marginMs },
-    });
+    out.push(resolved("wrongRankPenalty"));
     return { ok: true, state, out };
   }
 
@@ -432,24 +434,23 @@ function resolveSnap(
   state.discard.push(cardId);
   forgetCard(state, cardId);
 
-  if (targetId === winnerId) {
-    out.push({
-      to: "all",
-      event: { t: "snap.resolved", winnerId, targetId, slot, outcome: "ownCardDiscarded", marginMs },
-    });
+  if (targetId === slapperId) {
+    out.push(resolved("ownCardDiscarded"));
     // Emptying your hand ends the round on the spot - nothing beats zero cards.
-    if (winner.hand.length === 0) finishRound(state, out);
+    if (slapper.hand.length === 0) finishRound(state, out);
     return { ok: true, state, out };
   }
 
-  // Snapping someone else's card means handing one of yours over in its place.
-  state.snapGiveFor = { snapperId: winnerId, targetId };
-  state.phase = "snapGiveCard";
-  out.push({
-    to: "all",
-    event: { t: "snap.resolved", winnerId, targetId, slot, outcome: "otherCardDiscarded", marginMs },
-  });
+  // Slapping someone else's card means handing one of yours over in its place.
+  state.slapGiveFor = { slapperId, targetId };
+  state.phase = "slapGiveCard";
+  out.push(resolved("otherCardDiscarded"));
   return { ok: true, state, out };
+}
+
+/** Whether a settled slap was right, and so ends the queue behind it. */
+export function slapLanded(outcome: SlapOutcome): boolean {
+  return outcome === "ownCardDiscarded" || outcome === "otherCardDiscarded";
 }
 
 /** The phase a power waits in while the player resolves it. */
@@ -466,8 +467,8 @@ function phaseForPower(power: Power): Phase {
   }
 }
 
-/** Where the table returns to once a snapper has paid their card. */
-function phaseAfterSnapGive(state: GameState): Phase {
+/** Where the table returns to once a slapper has paid their card. */
+function phaseAfterSlapGive(state: GameState): Phase {
   if (state.held !== null) return "holdingCard";
   return state.pendingPower === null ? "awaitingAction" : phaseForPower(state.pendingPower);
 }
@@ -478,7 +479,7 @@ function turnDeadline(state: GameState, ctx: ReduceCtx): number | null {
 
 /**
  * Bring the deck back from the discard pile, keeping the top card face up so a
- * snap target always exists. Returns false when there is nothing left to draw.
+ * slap target always exists. Returns false when there is nothing left to draw.
  */
 function refillDeckIfEmpty(state: GameState, ctx: ReduceCtx): boolean {
   if (state.deck.length > 0) return true;
@@ -525,7 +526,7 @@ function finishRound(state: GameState, out: Outbound[]): void {
   state.held = null;
   state.pendingPower = null;
   state.kingPeeked = false;
-  state.snapGiveFor = null;
+  state.slapGiveFor = null;
   state.turnEndsAt = null;
 
   const result = settle(state);

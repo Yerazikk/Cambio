@@ -107,7 +107,7 @@ export function connect(handlers: SocketHandlers): Connection {
         return;
       }
       // Answer latency probes immediately and without comment: the round trip
-      // the server measures here is what makes snap races fair.
+      // the server measures here is what makes slap races fair.
       if (parsed.t === "ping") {
         next.send(JSON.stringify({ t: "pong", nonce: parsed.nonce } satisfies ClientMsg));
         return;

@@ -29,7 +29,7 @@ export function Home({ onCreate, onJoin, disabled }: HomeProps): React.JSX.Eleme
 
       <h1 className="home__title">Cambio</h1>
       <p className="home__tagline">
-        Lowest hand wins &mdash; if you can remember what you are holding. Snap a match the moment you see it.
+        End the round with the fewest points
       </p>
       <hr className="home__rule" />
 

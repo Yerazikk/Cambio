@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { knows, learn, snapOpen, viewFor } from "../../src/engine/state.js";
+import { knows, learn, slapOpen, viewFor } from "../../src/engine/state.js";
 import { fixture, slotFaces } from "../helpers.js";
 
 describe("view redaction", () => {
@@ -92,7 +92,7 @@ describe("view redaction", () => {
     expect(viewFor(state, "bo").pendingPower).toBeNull();
   });
 
-  it("publishes the discard top to everyone, since snapping depends on it", () => {
+  it("publishes the discard top to everyone, since slapping depends on it", () => {
     const state = fixture({ hands: { ana: ["S7"], bo: ["C3"] }, discard: ["S2", "H9"] });
     for (const viewer of ["ana", "bo"]) {
       expect(viewFor(state, viewer).discardTop?.id).toBe("H9");
@@ -140,40 +140,40 @@ describe("knowledge follows the card, not the slot", () => {
   });
 });
 
-describe("snap availability", () => {
+describe("slap availability", () => {
   it("is open during play while a discard top exists", () => {
     const state = fixture({ hands: { ana: ["S7"], bo: ["C3"] }, discard: ["S2"] });
-    expect(snapOpen(state)).toBe(true);
-    expect(viewFor(state, "ana").snapOpen).toBe(true);
+    expect(slapOpen(state)).toBe(true);
+    expect(viewFor(state, "ana").slapOpen).toBe(true);
   });
 
   it("is closed with an empty discard pile", () => {
     const state = fixture({ hands: { ana: ["S7"], bo: ["C3"] }, discard: [] });
-    expect(snapOpen(state)).toBe(false);
+    expect(slapOpen(state)).toBe(false);
   });
 
   it("is closed in the lobby, the study phase, and after the round ends", () => {
     for (const phase of ["lobby", "study", "finished"] as const) {
       const state = fixture({ hands: { ana: ["S7"], bo: ["C3"] }, discard: ["S2"], phase });
-      expect(snapOpen(state), phase).toBe(false);
+      expect(slapOpen(state), phase).toBe(false);
     }
   });
 
-  it("is closed while a snapper still owes a card", () => {
+  it("is closed while a slapper still owes a card", () => {
     const state = fixture({ hands: { ana: ["S7"], bo: ["C3"] }, discard: ["S2"] });
-    state.snapGiveFor = { snapperId: "ana", targetId: "bo" };
-    expect(snapOpen(state)).toBe(false);
+    state.slapGiveFor = { slapperId: "ana", targetId: "bo" };
+    expect(slapOpen(state)).toBe(false);
   });
 
-  it("honours the rule flag for snapping after a Cambio call", () => {
+  it("honours the rule flag for slapping after a Cambio call", () => {
     const base = { hands: { ana: ["S7"], bo: ["C3"] }, discard: ["S2"] };
 
-    const live = fixture({ ...base, rules: { snapAfterCambio: true } });
+    const live = fixture({ ...base, rules: { slapAfterCambio: true } });
     live.cambioCallerId = "ana";
-    expect(snapOpen(live)).toBe(true);
+    expect(slapOpen(live)).toBe(true);
 
-    const closed = fixture({ ...base, rules: { snapAfterCambio: false } });
+    const closed = fixture({ ...base, rules: { slapAfterCambio: false } });
     closed.cambioCallerId = "ana";
-    expect(snapOpen(closed)).toBe(false);
+    expect(slapOpen(closed)).toBe(false);
   });
 });

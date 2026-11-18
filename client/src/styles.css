@@ -4,7 +4,7 @@
  * The table is white - the colour of a card, of a sheet of paper, of the felt
  * on a good table under good light. Nothing on it is coloured for decoration:
  * ink for what you read, brass for whose turn it is, green for a choice you
- * have made, red for a snap. Everything else is a hairline and a shadow.
+ * have made, red for a slap. Everything else is a hairline and a shadow.
  */
 
 :root {
@@ -407,7 +407,7 @@ kbd {
   white-space: nowrap;
 }
 /*
- * The number of a slot in your own hand, which is also the key that snaps it.
+ * The number of a slot in your own hand, which is also the key that slaps it.
  * It is printed on the frame rather than on either face, so it stays upright
  * and legible through a flip and over any card back.
  */
@@ -434,7 +434,7 @@ kbd {
 
 /*
  * A ring says what a card is right now: brass for one you may click, green for
- * one you have chosen, red for one in the middle of a snap. It is drawn on the
+ * one you have chosen, red for one in the middle of a slap. It is drawn on the
  * frame rather than the faces, so it holds still and stays legible while the
  * card itself turns over.
  */
@@ -451,7 +451,7 @@ kbd {
 
 .card--targetable,
 .card--selected,
-.card--snap {
+.card--slap {
   cursor: pointer;
 }
 .card--targetable {
@@ -469,14 +469,14 @@ kbd {
   --ring: var(--green);
   transform: translateY(-6px);
 }
-.card--snap {
+.card--slap {
   --ring: var(--red);
 }
-/* A live snap target breathes, because it is asking to be hit. */
-.card--snap::after {
-  animation: snap-ring 1.15s var(--ease-io) infinite;
+/* A live slap target breathes, because it is asking to be hit. */
+.card--slap::after {
+  animation: slap-ring 1.15s var(--ease-io) infinite;
 }
-@keyframes snap-ring {
+@keyframes slap-ring {
   0%,
   100% {
     box-shadow: 0 0 0 0 rgba(192, 53, 47, 0.32);
@@ -501,14 +501,14 @@ kbd {
  * The ring stays for as long as the move is live, so a player who glances over
  * a beat late still sees which card it was; the motion on top of it is for
  * whoever was watching when it landed. Brass is a look, blue a trade, green a
- * card arriving, red a snap or a penalty.
+ * card arriving, red a slap or a penalty.
  */
 .card--did-peek,
 .card--did-swap,
 .card--did-replace,
 .card--did-give,
 .card--did-penalty,
-.card--did-snap {
+.card--did-slap {
   z-index: 3;
 }
 .card--did-peek {
@@ -522,7 +522,7 @@ kbd {
   --ring: var(--green);
 }
 .card--did-penalty,
-.card--did-snap {
+.card--did-slap {
   --ring: var(--red);
 }
 
@@ -581,10 +581,10 @@ kbd {
 }
 /* Slapped. */
 .card--did-penalty,
-.card--did-snap {
-  animation: did-snap 620ms var(--ease-io);
+.card--did-slap {
+  animation: did-slap 620ms var(--ease-io);
 }
-@keyframes did-snap {
+@keyframes did-slap {
   0%,
   100% {
     transform: none;
@@ -1168,17 +1168,17 @@ kbd {
   margin-left: auto;
 }
 
-.snapbar {
+.slapbar {
   display: flex;
   align-items: center;
   gap: 0.85rem;
   flex: 0 1 auto;
 }
 /*
- * The snap button. The one place on the table where milliseconds decide
+ * The slap button. The one place on the table where milliseconds decide
  * something, so it is the one thing on the table that is loud.
  */
-.snapbar__button {
+.slapbar__button {
   position: relative;
   font: 750 0.92rem/1 var(--sans);
   letter-spacing: 0.14em;
@@ -1197,22 +1197,22 @@ kbd {
     transform 120ms var(--ease-out),
     box-shadow 160ms var(--ease-out);
 }
-.snapbar__button:hover:not(:disabled) {
+.slapbar__button:hover:not(:disabled) {
   background: #cf3b34;
   transform: translateY(-1px);
 }
-.snapbar__button:active:not(:disabled) {
+.slapbar__button:active:not(:disabled) {
   transform: translateY(1px);
   box-shadow: 0 1px 2px rgba(22, 24, 29, 0.1);
 }
-.snapbar__button:disabled {
+.slapbar__button:disabled {
   background: var(--paper);
   border-color: var(--line-strong);
   color: var(--faint);
   box-shadow: none;
   cursor: not-allowed;
 }
-.snapbar__button:focus-visible {
+.slapbar__button:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
 }
@@ -1221,12 +1221,12 @@ kbd {
  * Arming leaves the pointer sitting on the button, so these have to outrank
  * its hover state or the colour would never change.
  */
-.snapbar--armed .snapbar__button:not(:disabled) {
+.slapbar--armed .slapbar__button:not(:disabled) {
   background: var(--brass);
   border-color: var(--brass);
   animation: armed 1.15s var(--ease-io) infinite;
 }
-.snapbar--armed .snapbar__button:not(:disabled):hover {
+.slapbar--armed .slapbar__button:not(:disabled):hover {
   background: #b98f35;
 }
 @keyframes armed {
@@ -1238,13 +1238,13 @@ kbd {
     box-shadow: 0 0 0 10px rgba(168, 127, 43, 0);
   }
 }
-.snapbar--pending .snapbar__button:not(:disabled),
-.snapbar--pending .snapbar__button:not(:disabled):hover {
+.slapbar--pending .slapbar__button:not(:disabled),
+.slapbar--pending .slapbar__button:not(:disabled):hover {
   background: var(--green);
   border-color: var(--green);
   animation: none;
 }
-.snapbar__hint {
+.slapbar__hint {
   margin: 0;
   font-size: 0.78rem;
   color: var(--muted);
@@ -1759,6 +1759,165 @@ kbd {
   }
 }
 
+/* ------------------------------------------------------------------- help */
+
+/*
+ * The rule book, folded into the corner of the table.
+ *
+ * It is a single mark until you want it - the one piece of furniture on the
+ * screen that is not part of the game - and it opens upwards out of its own
+ * corner rather than over the middle, so the table you are asking about is
+ * still there behind it.
+ */
+.help {
+  position: fixed;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.help__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+  background: rgba(22, 24, 29, 0.14);
+  animation: help-scrim 180ms var(--ease-out);
+}
+@keyframes help-scrim {
+  from {
+    opacity: 0;
+  }
+}
+
+.help__button {
+  font: 600 1rem/1 var(--serif);
+  font-style: italic;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--muted);
+  cursor: pointer;
+  box-shadow: var(--e1);
+  transition:
+    color 140ms var(--ease-io),
+    border-color 140ms var(--ease-io),
+    box-shadow 160ms var(--ease-out),
+    transform 140ms var(--ease-out);
+}
+.help__button:hover {
+  color: var(--ink);
+  border-color: rgba(22, 24, 29, 0.28);
+  box-shadow: var(--e2);
+  transform: translateY(-1px);
+}
+.help__button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.help__button[aria-expanded="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.help__panel {
+  width: min(27rem, calc(100vw - 2.2rem));
+  max-height: min(34rem, calc(100vh - 6rem));
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--e3);
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: help-open 200ms var(--ease-out);
+}
+@keyframes help-open {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+.help__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.7rem 0.7rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.help__title {
+  margin: 0;
+  font: 600 0.95rem/1.2 var(--serif);
+  letter-spacing: 0.01em;
+}
+
+.help__body {
+  overflow-y: auto;
+  padding: 0.3rem 1.1rem 1.1rem;
+  font-size: 0.86rem;
+  color: var(--text);
+}
+.help__body p {
+  margin: 0.45rem 0;
+}
+
+/* Each section is announced by a rule and a small caps line, not a heading. */
+.help__h {
+  margin: 1.15rem 0 0.3rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+}
+.help__body > .help__h:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0.7rem;
+}
+
+/* Two columns for anything that is a lookup: a rank, then what it is worth. */
+.help__pairs {
+  margin: 0.5rem 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 0.9rem;
+  align-items: baseline;
+}
+.help__pairs dt {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.help__pairs dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+.help__steps {
+  margin: 0.5rem 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.help__aside {
+  color: var(--muted);
+}
+
 /* ------------------------------------------------------------- the window */
 
 /*
@@ -1821,7 +1980,7 @@ kbd {
   .tablelog {
     display: none;
   }
-  .snapbar {
+  .slapbar {
     flex: 1 1 100%;
   }
   .table__buttons {
@@ -1829,6 +1988,14 @@ kbd {
   }
   .backs__choices {
     grid-template-columns: repeat(4, 1fr);
+  }
+  /* On a phone the panel is the screen, so it stops pretending to be a corner. */
+  .help {
+    right: 0.7rem;
+    bottom: 0.7rem;
+  }
+  .help__panel {
+    max-height: calc(100vh - 4.5rem);
   }
 }
 

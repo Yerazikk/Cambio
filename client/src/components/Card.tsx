@@ -6,12 +6,12 @@ import { cardLabel, isRed, rankLabel, suitSymbol, type Card } from "@cambio/shar
  * table's body language: everyone sees the same lift, trade or slap at the
  * same moment, which is the only way a face-down game stays legible.
  */
-export type Flash = "peek" | "swap" | "replace" | "give" | "penalty" | "snap";
+export type Flash = "peek" | "swap" | "replace" | "give" | "penalty" | "slap";
 
 export type CardFaceProps = {
   card: Card | null;
   /** How this card should read: a live target, a chosen one, or just scenery. */
-  state?: "idle" | "targetable" | "selected" | "snap";
+  state?: "idle" | "targetable" | "selected" | "slap";
   size?: "normal" | "small" | "large";
   label?: string;
   /** What just happened to this card, if anything. */
@@ -74,7 +74,7 @@ export function CardFace({
   if (face !== null && isRed(face.suit)) classes.push("card--red");
   if (flash !== null) classes.push(`card--did-${flash}`);
 
-  const interactive = onClick !== undefined && (state === "targetable" || state === "snap" || state === "selected");
+  const interactive = onClick !== undefined && (state === "targetable" || state === "slap" || state === "selected");
   const described = card === null ? "face-down card" : `${cardLabel(card)}, worth ${card.points}`;
 
   const inside = (
@@ -117,7 +117,7 @@ export function CardFace({
       data-testid={testId}
       onClick={onClick}
       style={style}
-      aria-label={`${described} - ${state === "snap" ? "snap this card" : "choose this card"}`}
+      aria-label={`${described} - ${state === "slap" ? "slap this card" : "choose this card"}`}
     >
       {inside}
     </button>
