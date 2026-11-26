@@ -25,6 +25,31 @@ export type Seat = {
 
 export type Held = { cardId: CardId; fromDiscard: boolean };
 
+/** One player's place in the slap queue, and the card they have named, if any. */
+export type SlapQueueEntry = {
+  playerId: PlayerId;
+  /** The card this slap means, once it has been named. Null while unanswered. */
+  targetId: PlayerId | null;
+  slot: number | null;
+};
+
+/**
+ * The table, stopped on a slap.
+ *
+ * Slapping is not a thing that happens alongside the game - it interrupts it.
+ * The first slap takes the lock, every turn action is refused until the queue
+ * has emptied, and the clock on the turn it interrupted is held rather than
+ * run down, so nobody loses their turn to somebody else's slap.
+ */
+export type SlapLock = {
+  /** queue[0] holds the lock; everyone behind is waiting their go. */
+  queue: SlapQueueEntry[];
+  /** When the holder's time to name a card runs out, or null when untimed. */
+  endsAt: number | null;
+  /** What was left of the interrupted turn's clock, to be given back after. */
+  turnRemainingMs: number | null;
+};
+
 export type GameState = {
   code: RoomCode;
   rules: RuleConfig;
@@ -58,6 +83,8 @@ export type GameState = {
   kingPeeked: boolean;
   /** Set while a slapper who took another player's card owes them one back. */
   slapGiveFor: { slapperId: PlayerId; targetId: PlayerId } | null;
+  /** Set while the table is stopped on a slap. See SlapLock. */
+  slapLock: SlapLock | null;
   cambioCallerId: PlayerId | null;
   finalTurnsRemaining: number | null;
   winnerId: PlayerId | null;
@@ -105,7 +132,23 @@ export function discardTopCard(state: GameState): Card | null {
   return id === undefined ? null : (state.cards.get(id) ?? null);
 }
 
-/** Slapping is legal whenever there is a discard top to match against. */
+/** Who the table is waiting on, if a slap has stopped it. */
+export function lockHolder(state: GameState): SlapQueueEntry | null {
+  return state.slapLock?.queue[0] ?? null;
+}
+
+/** Whether a slap has the table stopped. */
+export function isLocked(state: GameState): boolean {
+  return lockHolder(state) !== null;
+}
+
+/**
+ * Slapping is legal whenever there is a discard top to match against.
+ *
+ * It stays legal while another player holds the lock: slapping then does not
+ * jump the queue, it joins it - which is the whole of the rule that a slap is
+ * never thrown away for being second.
+ */
 export function slapOpen(state: GameState): boolean {
   if (state.phase === "lobby" || state.phase === "study" || state.phase === "finished") return false;
   if (state.slapGiveFor !== null) return false;
@@ -159,6 +202,7 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
     turnPlayerId: turn?.id ?? null,
     turnEndsAt: state.turnEndsAt,
     decks: state.rules.decks,
+    optionalPowers: state.rules.optionalPowers,
     back: state.back,
     deckCount: state.deck.length,
     discardTop: discardTopCard(state),
@@ -171,7 +215,20 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
     slapDebt: state.slapGiveFor,
     finalTurnsRemaining: state.finalTurnsRemaining,
     slapOpen: slapOpen(state),
+    slapLock: lockView(state),
     winnerId: state.winnerId,
+  };
+}
+
+/** The stopped table as the clients see it: who owes a card, and who is next. */
+function lockView(state: GameState): GameView["slapLock"] {
+  const lock = state.slapLock;
+  const holder = lock?.queue[0];
+  if (lock === null || lock === undefined || holder === undefined) return null;
+  return {
+    holderId: holder.playerId,
+    waiting: lock.queue.slice(1).map((entry) => entry.playerId),
+    endsAt: lock.endsAt,
   };
 }
 

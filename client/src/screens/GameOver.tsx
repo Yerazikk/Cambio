@@ -28,7 +28,7 @@ export function GameOver({ view, me, onRestart, onLeave }: GameOverProps): React
             <span className="over__rank">{index + 1}</span>
             <span className="over__name">
               {player.name}
-              {player.calledCambio && <span className="chip chip--red">called</span>}
+              {player.calledCambio && <span className="chip chip--red">Cambié</span>}
               <span className="over__cards">
                 {player.slots.map((slot) => (slot.known ? labelOf(slot.card.rank) : "?")).join("  ")}
               </span>

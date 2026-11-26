@@ -203,7 +203,7 @@ test.describe("the lobby", () => {
     await expect(bo!.page.getByTestId("ready-button")).toBeVisible();
     await bo!.page.getByTestId("ready-button").click();
 
-    await expect(ana!.page.getByTestId("prompt")).toContainText(/your turn/i);
+    await expect(ana!.page.getByTestId("table")).toHaveAttribute("data-my-turn", "");
     await expect(bo!.page.getByTestId("prompt")).toContainText(/ana's turn/i);
 
     for (const player of players) await player.close();

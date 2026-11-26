@@ -20,6 +20,8 @@ export type CardFaceProps = {
   testId?: string;
   /** Where this card sits in its hand, which is the order it is dealt in. */
   dealIndex?: number;
+  /** Which column and row of its owner's hand this card lies in. */
+  place?: { col: number; row: number };
 };
 
 /**
@@ -52,6 +54,7 @@ export function CardFace({
   onClick,
   testId,
   dealIndex,
+  place,
 }: CardFaceProps): React.JSX.Element {
   /*
    * The face to print on the front, which outlives the card by one flip. The
@@ -99,8 +102,15 @@ export function CardFace({
   );
 
   // The deal runs round the table in turn order, so each card needs to know
-  // where it sits in the hand to take its place in the queue.
-  const style = dealIndex === undefined ? undefined : ({ "--slot-i": dealIndex } as React.CSSProperties);
+  // where it sits in the hand to take its place in the queue - and the hand
+  // lays itself out from the same two numbers.
+  const style =
+    dealIndex === undefined && place === undefined
+      ? undefined
+      : ({
+          ...(dealIndex === undefined ? {} : { "--slot-i": dealIndex }),
+          ...(place === undefined ? {} : { "--col": place.col, "--row": place.row }),
+        } as React.CSSProperties);
 
   if (!interactive) {
     return (

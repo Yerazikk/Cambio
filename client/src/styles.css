@@ -1,61 +1,20 @@
 /*
- * Cambio, in paper and ink.
+ * Cambio, wearing the Yass kit.
  *
- * The table is white - the colour of a card, of a sheet of paper, of the felt
- * on a good table under good light. Nothing on it is coloured for decoration:
- * ink for what you read, brass for whose turn it is, green for a choice you
- * have made, red for a slap. Everything else is a hairline and a shadow.
+ * The look is the kit's (Natural OS 3.0): ink carries every decision, the
+ * accent only ever marks what is live, ember says "needs you" and leaf says
+ * "working", and all of it stands on a soft ground with a bloom in two
+ * corners. Nothing you can touch has an outline - it has a veil fill and a
+ * capsule edge. Nothing is smaller than a 24 corner. Commit Mono at 500, 300 for
+ * the one big thing on a screen, 400 for running text. There is no bold.
+ *
+ * The feel is the table's own and is untouched: the same flip, the same deal
+ * round the ring, the same lift when a card is picked up, at the same timings.
+ *
+ * Every colour lives in theme.css, which is also where the theme is chosen.
  */
 
-:root {
-  /* ---- ground */
-  --bg: #f4f3ef;
-  --bg-top: #fbfaf7;
-  --paper: #ffffff;
-  --surface: #fdfcfa;
-  --sunk: #efeee9;
-
-  /* ---- ink */
-  --ink: #16181d;
-  --text: #1c1e24;
-  --muted: #6e737c;
-  --faint: #9ba0a9;
-  --line: rgba(22, 24, 29, 0.09);
-  --line-strong: rgba(22, 24, 29, 0.16);
-
-  /* ---- the four things colour is allowed to mean */
-  --brass: #a87f2b;
-  --brass-soft: rgba(168, 127, 43, 0.1);
-  --green: #1f7a56;
-  --green-soft: rgba(31, 122, 86, 0.1);
-  --red: #c0352f;
-  --red-soft: rgba(192, 53, 47, 0.1);
-  --blue: #3a6ea5;
-  --blue-soft: rgba(58, 110, 165, 0.1);
-
-  /* ---- form */
-  --r-sm: 8px;
-  --r: 12px;
-  --r-lg: 16px;
-  --e1: 0 1px 2px rgba(22, 24, 29, 0.05), 0 1px 1px rgba(22, 24, 29, 0.04);
-  --e2: 0 1px 2px rgba(22, 24, 29, 0.05), 0 6px 14px -6px rgba(22, 24, 29, 0.16);
-  --e3: 0 2px 4px rgba(22, 24, 29, 0.05), 0 18px 32px -12px rgba(22, 24, 29, 0.2);
-  --card-shadow: 0 1px 1px rgba(22, 24, 29, 0.07), 0 3px 7px -3px rgba(22, 24, 29, 0.16);
-  --card-shadow-lift: 0 2px 3px rgba(22, 24, 29, 0.06), 0 14px 22px -10px rgba(22, 24, 29, 0.28);
-
-  /* ---- motion. One easing for settling, one for turning over. */
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-io: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-back: cubic-bezier(0.34, 1.4, 0.64, 1);
-  --ease-flip: cubic-bezier(0.45, 0.04, 0.25, 1);
-  --flip-ms: 520ms;
-
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-
-  color-scheme: light;
-}
+@import "./theme.css";
 
 * {
   box-sizing: border-box;
@@ -63,11 +22,12 @@
 
 body {
   margin: 0;
-  font: 15px/1.55 var(--sans);
+  font: 500 15px/1.5 var(--sans);
+  letter-spacing: -0.01em;
   color: var(--text);
   background: var(--bg);
-  /* The light falls from above, as it would over a table. */
-  background-image: radial-gradient(130% 80% at 50% -14%, var(--bg-top) 0%, var(--bg) 62%, #eceae4 100%);
+  /* The ground: a ramp with the light coming up off the bottom edge. */
+  background-image: var(--gl-page);
   background-attachment: fixed;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -80,205 +40,265 @@ body {
   flex-direction: column;
 }
 
+/* One Light title to a screen, at 32 and above; everything smaller is 500. */
 h1,
 h2,
 h3 {
-  font-family: var(--serif);
+  font-family: var(--sans);
   font-weight: 500;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.03em;
   color: var(--ink);
 }
 
 ::selection {
-  background: rgba(168, 127, 43, 0.22);
+  background: color-mix(in srgb, var(--active) 28%, transparent);
+}
+
+::placeholder {
+  color: var(--faint);
+  font-weight: 400;
+  opacity: 1;
 }
 
 /* ------------------------------------------------------------------ atoms */
 
+/*
+ * A button is a capsule with a veil fill. Ink is the one that asks for a
+ * decision, veil is everything else, and a bare one is a way out. A press
+ * shrinks it and takes it to 86% - it does not bounce, and it is never
+ * coloured: a button that needs you says so with an ember dot, not with paint.
+ */
 .button {
-  font: inherit;
-  font-weight: 550;
+  position: relative;
+  font: 500 15px/20px var(--sans);
+  letter-spacing: -0.01em;
   color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r);
-  padding: 0.62rem 1.1rem;
+  background: var(--gl-well);
+  border: 0;
+  border-radius: var(--r-pill);
+  min-height: 48px;
+  padding: 0.75rem 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   cursor: pointer;
   box-shadow: var(--e1);
+  -webkit-tap-highlight-color: transparent;
   transition:
-    background 140ms var(--ease-io),
-    border-color 140ms var(--ease-io),
+    background 160ms var(--ease-io),
     box-shadow 160ms var(--ease-out),
-    transform 140ms var(--ease-out),
+    opacity 110ms var(--ease-io),
+    transform 90ms var(--ease-out),
     color 140ms var(--ease-io);
 }
 .button:hover:not(:disabled) {
-  border-color: rgba(22, 24, 29, 0.28);
+  background: var(--gl-well-light);
   box-shadow: var(--e2);
-  transform: translateY(-1px);
 }
 .button:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: var(--e1);
+  opacity: 0.86;
+  transform: scale(0.97);
 }
 .button:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--gl-ring);
 }
 .button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
   box-shadow: none;
 }
 
 .button--primary {
   background: var(--ink);
-  border-color: var(--ink);
   color: #fff;
 }
 .button--primary:hover:not(:disabled) {
-  background: #2b2f37;
-  border-color: #2b2f37;
+  background: color-mix(in srgb, #fff 10%, var(--ink));
 }
 
-.button--danger {
-  color: var(--red);
-  border-color: rgba(192, 53, 47, 0.3);
-  background: var(--paper);
-}
-.button--danger:hover:not(:disabled) {
-  background: var(--red-soft);
-  border-color: rgba(192, 53, 47, 0.5);
+/*
+ * The one button on the table that ends something. The kit does not colour a
+ * control, so what marks it is a 6px dot in front of the label - here in the
+ * maroon of a called Cambio rather than in ember, because this is not a
+ * state that passes.
+ */
+.button--danger::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--called);
 }
 
 .button--ghost {
   background: transparent;
-  border-color: transparent;
   box-shadow: none;
   color: var(--muted);
 }
 .button--ghost:hover:not(:disabled) {
-  background: rgba(22, 24, 29, 0.05);
-  border-color: transparent;
+  background: var(--gl-well);
   box-shadow: none;
   color: var(--ink);
 }
 
 .button--small {
-  padding: 0.34rem 0.72rem;
-  font-size: 0.84rem;
-  border-radius: var(--r-sm);
+  min-height: 32px;
+  padding: 0.3rem 0.9rem;
+  font-size: 13px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
+/* A label is a caption, not a rule of small caps: 12/16 at 500, no tracking. */
 .field__label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--faint);
+  font: 500 12px/16px var(--sans);
+  letter-spacing: 0;
+  color: var(--muted);
+  padding-left: 1.25rem;
 }
+/*
+ * A field is a capsule of the same veil as a button, with no rim at all. The
+ * caret is the accent, which with the focus ring is the only place the accent
+ * is ever a fill.
+ */
 .field__input {
-  font: inherit;
-  padding: 0.68rem 0.85rem;
-  border-radius: var(--r);
-  border: 1px solid var(--line-strong);
-  background: var(--paper);
+  font: 500 15px/20px var(--sans);
+  letter-spacing: -0.01em;
+  min-height: 52px;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--r-pill);
+  border: 0;
+  background: var(--gl-well);
   color: var(--ink);
-  box-shadow: inset 0 1px 2px rgba(22, 24, 29, 0.04);
+  caret-color: var(--active);
+  box-shadow: var(--e1);
   transition:
-    border-color 140ms var(--ease-io),
+    background 140ms var(--ease-io),
     box-shadow 160ms var(--ease-out);
 }
-.field__input::placeholder {
-  color: #c2c6cc;
-}
 .field__input:hover {
-  border-color: rgba(22, 24, 29, 0.24);
+  background: var(--gl-well-light);
 }
 .field__input:focus {
   outline: none;
-  border-color: var(--ink);
-  box-shadow: 0 0 0 3px rgba(22, 24, 29, 0.08);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--e1), 0 0 0 2px color-mix(in srgb, var(--active) 55%, transparent);
 }
 .field__input--code {
   text-transform: uppercase;
-  letter-spacing: 0.3em;
-  font-family: var(--mono);
-  font-weight: 600;
+  letter-spacing: 0.26em;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
+/* A key is a small well, the shape of the thing it stands for. */
 kbd {
-  font: 600 0.74em/1.4 var(--mono);
-  background: var(--paper);
-  border: 1px solid var(--line-strong);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-  padding: 0.14em 0.4em;
+  font: 500 0.78em/1.4 var(--sans);
+  background: var(--gl-well-light);
+  border: 0;
+  border-radius: 7px;
+  padding: 0.16em 0.44em;
   color: var(--ink);
+  box-shadow: var(--e1);
 }
 
-/* A chip: the smallest piece of furniture on the table. */
+/*
+ * A chip: the smallest piece of furniture on the table. One capsule, three
+ * kinds - quiet, needs you (an ember dot), and nothing at all.
+ */
 .chip {
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.14rem 0.42rem;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  font: 500 12px/16px var(--sans);
+  letter-spacing: 0;
+  border-radius: var(--r-pill);
+  border: 0;
+  background: var(--gl-well);
+  color: var(--ink);
   white-space: nowrap;
 }
 .chip--brass {
-  border-color: rgba(168, 127, 43, 0.3);
-  background: var(--brass-soft);
-  color: #8a6720;
+  background: var(--gl-well-light);
+  color: var(--ink);
+  box-shadow: var(--e1);
 }
+/*
+ * Called Cambio: the one thing at a seat that needs watching, and the only
+ * bold word in the interface.
+ *
+ * Everything else that is urgent is ember, because ember is a state that
+ * passes - a slap settles, a card owed gets handed over. This one does not.
+ * Once Cambio is called the round is ending, so it is set in maroon: a deeper,
+ * more final red than either ember or the red of a heart, and the weight says
+ * the same thing a second time.
+ */
 .chip--red {
-  border-color: transparent;
-  background: var(--red);
-  color: #fff;
+  background: linear-gradient(
+      color-mix(in srgb, var(--called) 14%, transparent),
+      color-mix(in srgb, var(--called) 14%, transparent)
+    ),
+    var(--gl-well);
+  color: var(--called);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.chip--red::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--called);
 }
 .chip--quiet {
   background: transparent;
   color: var(--faint);
+  padding: 0 4px;
 }
 
+/*
+ * A banner is a sheet laid across the top of the window. It is never painted:
+ * the one that is bad news carries an ember dot, the same mark a chip uses.
+ */
 .banner {
-  padding: 0.6rem 1rem;
+  padding: 0.7rem 1.25rem;
   text-align: center;
-  background: var(--paper);
-  border-bottom: 1px solid var(--line);
+  background: var(--gl-sheet);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  backdrop-filter: blur(24px) saturate(1.2);
   display: flex;
   gap: 0.75rem;
   justify-content: center;
   align-items: center;
-  font-size: 0.88rem;
-  color: var(--muted);
-  box-shadow: var(--e1);
+  font: 500 14px/20px var(--sans);
+  color: var(--ink);
+  box-shadow: var(--gl-sheet-edge);
   animation: banner-in 320ms var(--ease-out);
 }
-.banner--bad {
-  background: var(--red);
-  border-color: transparent;
-  color: #fff;
+.banner--bad::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--needs);
 }
 .banner--bad .button {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: #fff;
+  background: var(--gl-well-light);
+  color: var(--ink);
   box-shadow: none;
 }
 .banner--bad .button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.26);
-  border-color: rgba(255, 255, 255, 0.6);
+  background: #fff;
 }
 @keyframes banner-in {
   from {
@@ -296,6 +316,11 @@ kbd {
  * a card over is a transition rather than a swap of markup, and the flip you
  * see is the same flip every time: your own peek, a power played across the
  * table, or every hand being shown at the end of a round.
+ *
+ * A card is the one thing here that keeps a small corner. The kit's floor of
+ * 24 is a rule about surfaces, and a card is not a surface - it is a picture
+ * of a printed object, cut to its own proportion, like the phone and laptop
+ * bodies the kit leaves alone. Its white and its red are print, not theme.
  */
 .card {
   position: relative;
@@ -307,7 +332,7 @@ kbd {
   width: var(--card-w, 52px);
   height: var(--card-h, 74px);
   /* The corner of a cut card is a fraction of its width, not a fixed radius. */
-  --card-r: max(3px, calc(var(--card-w, 52px) * 0.085));
+  --card-r: max(3px, calc(var(--card-w, 52px) * 0.09));
   border-radius: var(--card-r);
   flex: none;
   padding: 0;
@@ -355,10 +380,10 @@ kbd {
   box-shadow: var(--card-shadow);
 }
 .card__face--front {
-  background: var(--paper);
+  background: var(--card-paper);
   color: var(--suit, var(--ink));
   /* The hairline a printed card has, just inside its own edge. */
-  border: 1px solid rgba(22, 24, 29, 0.1);
+  border: 1px solid var(--gl-hair);
 }
 .card__face--back {
   transform: rotateY(180deg);
@@ -366,8 +391,8 @@ kbd {
    * The ground the artwork is painted on, so a back that has not loaded yet -
    * or a table with none set - still reads as a card rather than a hole.
    */
-  background: #e9ebef;
-  border: 1px solid rgba(22, 24, 29, 0.12);
+  background: var(--card-back-ground);
+  border: 1px solid var(--gl-hair-strong);
 }
 .card__art {
   position: absolute;
@@ -379,31 +404,31 @@ kbd {
 }
 
 .card--red {
-  --suit: var(--red);
+  --suit: var(--card-red);
 }
 
 .card__rank {
-  font-size: calc(var(--card-w, 52px) * 0.46);
-  font-weight: 700;
+  font-size: calc(var(--card-w, 52px) * 0.47);
+  font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums lining-nums;
 }
 .card__suit {
   font-size: calc(var(--card-w, 52px) * 0.32);
   line-height: 1;
-  margin-top: 0.1em;
+  margin-top: 0.08em;
 }
 .card--large .card__rank {
-  font-size: calc(var(--card-w, 52px) * 0.44);
+  font-size: calc(var(--card-w, 52px) * 0.45);
 }
 .card--large .card__suit {
   font-size: calc(var(--card-w, 52px) * 0.3);
 }
 .card__joker {
   font-size: calc(var(--card-w, 52px) * 0.18);
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 /*
@@ -415,17 +440,15 @@ kbd {
   position: absolute;
   right: 2px;
   bottom: 2px;
-  min-width: 13px;
-  height: 13px;
-  padding: 0 3px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 0 0 1px rgba(22, 24, 29, 0.08);
-  font-size: 0.56rem;
-  font-weight: 700;
-  line-height: 1;
+  box-shadow: var(--e1);
+  font: 500 0.58rem/1 var(--sans);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
@@ -433,10 +456,11 @@ kbd {
 }
 
 /*
- * A ring says what a card is right now: brass for one you may click, green for
- * one you have chosen, red for one in the middle of a slap. It is drawn on the
- * frame rather than the faces, so it holds still and stays legible while the
- * card itself turns over.
+ * A ring says what a card is right now. The kit allows colour three meanings
+ * and no more, so: the accent for a card that is live and yours to click, ink
+ * for one you have chosen - chosen is never a colour - and ember for one in
+ * the middle of a slap. The ring is drawn on the frame rather than the faces,
+ * so it holds still and stays legible while the card itself turns over.
  */
 .card::after {
   content: "";
@@ -455,7 +479,7 @@ kbd {
   cursor: pointer;
 }
 .card--targetable {
-  --ring: var(--brass);
+  --ring: var(--active);
 }
 .card--targetable:hover,
 .card--targetable:focus-visible {
@@ -466,11 +490,11 @@ kbd {
   box-shadow: var(--card-shadow-lift);
 }
 .card--selected {
-  --ring: var(--green);
+  --ring: var(--ink);
   transform: translateY(-6px);
 }
 .card--slap {
-  --ring: var(--red);
+  --ring: var(--needs);
 }
 /* A live slap target breathes, because it is asking to be hit. */
 .card--slap::after {
@@ -479,14 +503,14 @@ kbd {
 @keyframes slap-ring {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(192, 53, 47, 0.32);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--needs) 32%, transparent);
   }
   55% {
-    box-shadow: 0 0 0 7px rgba(192, 53, 47, 0);
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--needs) 0%, transparent);
   }
 }
 .card:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--active);
   outline-offset: 4px;
 }
 
@@ -500,8 +524,8 @@ kbd {
  *
  * The ring stays for as long as the move is live, so a player who glances over
  * a beat late still sees which card it was; the motion on top of it is for
- * whoever was watching when it landed. Brass is a look, blue a trade, green a
- * card arriving, red a slap or a penalty.
+ * whoever was watching when it landed. The accent is a look, ink a trade, leaf
+ * a card arriving, ember a slap or a penalty.
  */
 .card--did-peek,
 .card--did-swap,
@@ -512,18 +536,18 @@ kbd {
   z-index: 3;
 }
 .card--did-peek {
-  --ring: var(--brass);
+  --ring: var(--active);
 }
 .card--did-swap {
-  --ring: var(--blue);
+  --ring: var(--ink);
 }
 .card--did-replace,
 .card--did-give {
-  --ring: var(--green);
+  --ring: var(--working);
 }
 .card--did-penalty,
 .card--did-slap {
-  --ring: var(--red);
+  --ring: var(--needs);
 }
 
 /*
@@ -672,22 +696,33 @@ kbd {
   --card-base: clamp(26px, min(3.3vw, 4.8vh), 46px);
 }
 
+/*
+ * One line across the top, and it stays one line: the code, whatever the table
+ * is waiting for, the clock and the way out. It does not wrap, because a bar
+ * that grows a second row on a phone takes the height out of the table - and
+ * the table is the thing people came for.
+ */
 .table__bar {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  flex-wrap: wrap;
-  padding-bottom: 0.7rem;
+  gap: 0.7rem;
+  flex-wrap: nowrap;
+  min-width: 0;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--line);
 }
+/*
+ * The code is context rather than a control, and the kit lets exactly that
+ * keep a hairline: its outline capsule, nothing inside it.
+ */
 .table__code {
-  font: 600 0.74rem/1 var(--mono);
-  letter-spacing: 0.16em;
-  color: var(--faint);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.34rem 0.66rem;
-  background: var(--paper);
+  font: 500 12px/16px var(--sans);
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  padding: 0.4rem 0.8rem;
+  background: none;
 }
 /*
  * One line telling the player what the table is waiting for. It is the only
@@ -695,10 +730,16 @@ kbd {
  * a short cross-fade is what stops a change from going unnoticed.
  */
 .table__status {
-  flex: 1 1 14rem;
-  font-weight: 550;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 500;
+  font-size: 14px;
   color: var(--ink);
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
+  /* One line. Anything that does not fit is cut rather than given a second. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   animation: status-in 260ms var(--ease-out);
 }
 @keyframes status-in {
@@ -710,20 +751,21 @@ kbd {
 .table__right {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  /* So it keeps to the right even on a narrow window, where the bar wraps. */
+  gap: 0.4rem;
+  flex: none;
   margin-left: auto;
 }
 .clock {
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  font-size: 0.86rem;
-  color: var(--faint);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--muted);
   min-width: 2.6ch;
   text-align: right;
 }
+/* A clock about to run out is the table needing you: ember, as everywhere. */
 .clock--urgent {
-  color: var(--red);
+  color: var(--needs);
   animation: clock-tick 1s steps(1, end) infinite;
 }
 @keyframes clock-tick {
@@ -747,30 +789,26 @@ kbd {
   margin: 0 auto;
 }
 /*
- * The surface. White, like the table it is meant to be - a sheet of light with
- * an edge, rather than a slab of colour. Two hairlines do the work: one at the
- * rim and one set in from it, which is the embossed edge a good card table has
- * and the only ornament on the whole screen.
+ * The surface, in the kit's Glass: white at 58% over the ground, a white rim
+ * inside its own edge and light pooling along the bottom. Two hairlines do the
+ * rest - one at the rim and one set in from it, which is the embossed edge a
+ * good card table has and the only ornament on the whole screen.
  */
 .felt__surface {
   position: absolute;
   inset: 5% 4%;
   border-radius: 50%;
-  background:
-    radial-gradient(118% 92% at 50% 16%, #ffffff 0%, var(--surface) 46%, #f1efe9 100%);
-  border: 1px solid rgba(22, 24, 29, 0.08);
-  box-shadow:
-    inset 0 1px 0 #fff,
-    inset 0 0 40px rgba(22, 24, 29, 0.025),
-    0 1px 2px rgba(22, 24, 29, 0.04),
-    0 34px 60px -34px rgba(22, 24, 29, 0.22);
+  background: var(--gl-sheet);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: var(--gl-sheet-edge);
 }
 .felt__surface::after {
   content: "";
   position: absolute;
   inset: clamp(8px, 2.2%, 20px);
   border-radius: 50%;
-  border: 1px solid rgba(22, 24, 29, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .felt__middle {
@@ -789,7 +827,11 @@ kbd {
   height: calc(var(--card-w) * 4.6);
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(22, 24, 29, 0.055), rgba(22, 24, 29, 0) 70%);
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--tint-ink) 6%, transparent),
+    color-mix(in srgb, var(--tint-ink) 0%, transparent) 70%
+  );
   pointer-events: none;
 }
 
@@ -823,10 +865,10 @@ kbd {
   position: absolute;
   inset: 0;
   z-index: -1;
-  border-radius: max(3px, calc(var(--card-w) * 0.085));
-  background: #f2f1ed;
-  border: 1px solid rgba(22, 24, 29, 0.1);
-  box-shadow: 0 1px 1px rgba(22, 24, 29, 0.05);
+  border-radius: max(3px, calc(var(--card-w) * 0.09));
+  background: color-mix(in srgb, #fff 62%, var(--card-back-ground));
+  border: 1px solid var(--gl-hair);
+  box-shadow: var(--e1);
 }
 .pile__stack::before {
   transform: translate(3px, 3px);
@@ -834,16 +876,16 @@ kbd {
 .pile__stack::after {
   transform: translate(1.5px, 1.5px);
 }
+/* A caption, in the words it is written in: no small caps, no tracking. */
 .pile__label {
-  font-size: 0.62rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  font: 500 12px/16px var(--sans);
+  letter-spacing: 0;
   color: var(--faint);
   white-space: nowrap;
 }
 .pile__label strong {
-  color: var(--muted);
+  font-weight: 500;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 /* A pile that has just been drawn from or added to, so the movement is seen. */
@@ -863,7 +905,7 @@ kbd {
 }
 @keyframes pile-ring {
   0% {
-    border-color: var(--brass);
+    border-color: var(--active);
   }
   100% {
     border-color: transparent;
@@ -910,15 +952,19 @@ kbd {
   transform: translate(-50%, -94%);
 }
 /*
- * Whose turn it is, said once: a warm plate under the seat and a brass
- * nameplate. Nothing else on the table is brass, so there is never a question
- * about where the game is.
+ * Whose turn it is, said once and in one place: the name plate comes up to
+ * full ink and grows a lit dot beside it. It used to be a lit panel under the
+ * hand, which put a gradient between the player and their own cards - the one
+ * place on the table where nothing should come between the two.
  */
-.seat--turn .seat__cards {
-  background: linear-gradient(180deg, rgba(168, 127, 43, 0.09), rgba(168, 127, 43, 0.04));
-  box-shadow:
-    inset 0 0 0 1px rgba(168, 127, 43, 0.22),
-    0 10px 24px -14px rgba(168, 127, 43, 0.55);
+.seat--turn .seat__name::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--active);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active) 20%, transparent);
 }
 .seat--away {
   opacity: 0.45;
@@ -933,24 +979,24 @@ kbd {
   display: flex;
   align-items: center;
   gap: 0.34rem;
-  font-weight: 650;
-  font-size: 0.8rem;
-  letter-spacing: 0.005em;
-  color: var(--ink);
+  font: 500 13px/18px var(--sans);
+  letter-spacing: -0.01em;
+  color: var(--muted);
   white-space: nowrap;
 }
+/* The name of whoever is playing comes up to full ink. It is not recoloured. */
 .seat--turn .seat__name {
-  color: #7d5d1b;
+  color: var(--ink);
 }
 .seat__meta {
   display: flex;
   align-items: center;
   gap: 0.3rem;
 }
+/* A score is a number to read, so it is Light and tabular. */
 .seat__score {
-  font-family: var(--serif);
-  font-size: 0.95rem;
-  font-weight: 600;
+  font: 300 1.1rem/1 var(--sans);
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
@@ -977,7 +1023,7 @@ kbd {
    * same distance from the cards at every seat, and a seat takes the same
    * room on the felt whichever way round it is facing.
    */
-  --play-box: calc(var(--card-h) * (var(--seat-rows, 2) + var(--seat-held, 0)) + 0.9rem);
+  --play-box: calc(var(--card-h) * (2 + var(--seat-held, 0)) + 0.9rem);
   width: var(--play-box);
   height: var(--play-box);
   transform: rotate(var(--seat-angle, 0deg));
@@ -986,27 +1032,39 @@ kbd {
 }
 
 /*
- * Hands are two to a row rather than one long line, which is how they sit on a
- * table and what makes "the bottom two" a position a player can point at. A
- * hand that grows past four simply spills onto a third row.
+ * A hand is two rows deep and grows sideways, in columns of two.
+ *
+ * The box is the footprint of four cards and stays that size however many the
+ * player ends up holding: every card is placed at its own column and row, and
+ * a fifth and sixth land in a new column beside the hand rather than being
+ * flowed into it. Nothing already on the table moves when a penalty card
+ * arrives - which matters more here than anywhere, because the position of a
+ * card is the only thing a player has to remember it by.
+ *
+ * Columns run 0, 1, 2, 3 out to the right and then -1, -2 back out to the
+ * left, so the hand grows either side of a first column that never moves.
+ * `seating.ts` works out which; here it is only arithmetic.
+ *
+ * The hand itself is unpainted. Whose turn it is is said by the name plate,
+ * not by a panel under the cards, so there is nothing drawn behind them at
+ * all: the cards lie straight on the felt, the way they would on a table.
  */
 .seat__cards {
-  display: grid;
-  grid-template-columns: repeat(2, max-content);
-  gap: calc(var(--card-w) * 0.22);
-  justify-content: center;
-  padding: calc(var(--card-w) * 0.15);
-  border-radius: var(--r-lg);
+  --hand-gap: calc(var(--card-w) * 0.22);
+  position: relative;
+  width: calc(var(--card-w) * 2 + var(--hand-gap));
+  height: calc(var(--card-h) * 2 + var(--hand-gap));
   /* So a card being turned over turns, rather than merely narrowing. */
   perspective: 1200px;
-  transition:
-    background 220ms var(--ease-io),
-    box-shadow 240ms var(--ease-out);
+}
+.seat__cards > .card {
+  position: absolute;
+  left: calc(var(--col, 0) * (var(--card-w) + var(--hand-gap)));
+  top: calc(var(--row, 0) * (var(--card-h) + var(--hand-gap)));
 }
 .seat__empty {
   color: var(--faint);
-  font-size: 0.74rem;
-  font-style: italic;
+  font: 400 13px/18px var(--sans);
   padding: 0.7rem 0.3rem;
 }
 
@@ -1023,27 +1081,26 @@ kbd {
   align-items: center;
   gap: 0.25rem;
   padding-top: 0.45rem;
-  border-top: 1px solid rgba(168, 127, 43, 0.35);
+  border-top: 1px solid var(--line-strong);
   transform-style: preserve-3d;
   animation: held-in 320ms var(--ease-back);
 }
 .seat__held .card {
-  --ring: rgba(168, 127, 43, 0.75);
+  --ring: var(--active);
   /*
    * Tipped about its bottom edge, which is the edge resting on the table -
    * a card leans back off the felt, it does not hover parallel to it.
    */
   transform-origin: 50% 100%;
   transform: rotateX(var(--hold-tilt));
-  box-shadow: 0 calc(var(--card-h) * 0.12) calc(var(--card-h) * 0.16) -4px rgba(22, 24, 29, 0.3);
+  box-shadow: 0 calc(var(--card-h) * 0.12) calc(var(--card-h) * 0.16) -4px
+    color-mix(in srgb, var(--tint-ink) 30%, transparent);
 }
 /* Drawn from the deck, or taken off the discard - the two are not the same. */
 .seat__heldTag {
-  font-size: 0.55rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #8a6720;
+  font: 400 11px/14px var(--sans);
+  letter-spacing: 0;
+  color: var(--faint);
 }
 @keyframes held-in {
   from {
@@ -1091,8 +1148,8 @@ kbd {
   transform-origin: 50% 100%;
   transform: rotateX(var(--hold-tilt));
   box-shadow:
-    0 calc(var(--card-h) * 0.1) calc(var(--card-h) * 0.2) -6px rgba(22, 24, 29, 0.38),
-    0 2px 6px rgba(22, 24, 29, 0.12);
+    0 calc(var(--card-h) * 0.1) calc(var(--card-h) * 0.2) -6px color-mix(in srgb, var(--tint-ink) 38%, transparent),
+    0 2px 6px color-mix(in srgb, var(--tint-ink) 12%, transparent);
 }
 /*
  * The tag hangs under the card rather than in the flow below it, so the hand
@@ -1103,12 +1160,10 @@ kbd {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  margin-top: 0.2rem;
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #8a6720;
+  margin-top: 0.25rem;
+  font: 400 12px/16px var(--sans);
+  letter-spacing: 0;
+  color: var(--faint);
   white-space: nowrap;
 }
 @keyframes hand-in {
@@ -1128,8 +1183,7 @@ kbd {
   padding: 0;
   list-style: none;
   max-width: 13rem;
-  font-size: 0.74rem;
-  line-height: 1.45;
+  font: 400 12px/1.5 var(--sans);
   color: var(--faint);
   pointer-events: none;
 }
@@ -1140,7 +1194,7 @@ kbd {
 .tablelog__line--latest {
   opacity: 1;
   color: var(--ink);
-  font-weight: 550;
+  font-weight: 500;
   animation: log-in 300ms var(--ease-out);
 }
 @keyframes log-in {
@@ -1152,117 +1206,151 @@ kbd {
 
 /* ---------------------------------------------------------- turn controls */
 
+/*
+ * One row along the bottom, and it stays one row for the same reason the top
+ * bar does: every line of furniture is a line the table does not get.
+ */
 .table__controls {
   margin-top: auto;
   display: flex;
-  gap: 1rem;
+  gap: 0.6rem;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
   border-top: 1px solid var(--line);
-  padding-top: 0.9rem;
+  padding-top: 0.6rem;
+  /*
+   * The rule book's mark is fixed to the bottom-right corner of the window,
+   * and this row runs along the bottom of the table - so the row leaves it a
+   * gutter rather than putting a button underneath it. Nothing here is ever
+   * worth losing a click to.
+   */
+  padding-right: calc(42px + 1rem);
 }
 .table__buttons {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+  min-width: 0;
   margin-left: auto;
 }
 
 .slapbar {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  flex: 0 1 auto;
+  flex: none;
 }
 /*
  * The slap button. The one place on the table where milliseconds decide
- * something, so it is the one thing on the table that is loud.
+ * something - so it is an Ink button, the kit's own way of saying "this is the
+ * decision". It is not painted: what changes between its three states is the
+ * status dot in front of the label and whether the ring is going. Ember while
+ * it is armed and waiting for a card, leaf the moment the slap has landed.
  */
 .slapbar__button {
   position: relative;
-  font: 750 0.92rem/1 var(--sans);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  font: 500 15px/20px var(--sans);
+  letter-spacing: 0.02em;
   color: #fff;
-  background: var(--red);
-  border: 1px solid var(--red);
-  border-radius: var(--r);
-  padding: 0.8rem 1.5rem;
+  background: var(--ink);
+  border: 0;
+  border-radius: var(--r-pill);
+  min-height: 48px;
+  padding: 0.7rem 1.5rem;
   cursor: pointer;
   min-width: 8rem;
-  box-shadow: 0 1px 2px rgba(22, 24, 29, 0.1), 0 8px 18px -10px rgba(192, 53, 47, 0.8);
+  box-shadow: var(--e2);
+  -webkit-tap-highlight-color: transparent;
   transition:
     background 140ms var(--ease-io),
-    border-color 140ms var(--ease-io),
-    transform 120ms var(--ease-out),
+    opacity 110ms var(--ease-io),
+    transform 90ms var(--ease-out),
     box-shadow 160ms var(--ease-out);
 }
 .slapbar__button:hover:not(:disabled) {
-  background: #cf3b34;
-  transform: translateY(-1px);
+  background: color-mix(in srgb, #fff 10%, var(--ink));
 }
 .slapbar__button:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: 0 1px 2px rgba(22, 24, 29, 0.1);
+  opacity: 0.86;
+  transform: scale(0.97);
 }
 .slapbar__button:disabled {
-  background: var(--paper);
-  border-color: var(--line-strong);
+  background: var(--gl-well);
   color: var(--faint);
   box-shadow: none;
   cursor: not-allowed;
+  opacity: 0.4;
 }
 .slapbar__button:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 3px;
+  outline: none;
+  box-shadow: var(--gl-ring);
 }
 /*
  * Armed: the gesture has been made and the table is waiting for the card.
  * Arming leaves the pointer sitting on the button, so these have to outrank
- * its hover state or the colour would never change.
+ * its hover state.
  */
-.slapbar--armed .slapbar__button:not(:disabled) {
-  background: var(--brass);
-  border-color: var(--brass);
+.slapbar--armed .slapbar__button:not(:disabled),
+.slapbar--armed .slapbar__button:not(:disabled):hover {
   animation: armed 1.15s var(--ease-io) infinite;
 }
-.slapbar--armed .slapbar__button:not(:disabled):hover {
-  background: #b98f35;
+.slapbar--armed .slapbar__button:not(:disabled)::before,
+.slapbar--pending .slapbar__button:not(:disabled)::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--needs);
 }
 @keyframes armed {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(168, 127, 43, 0.45);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--needs) 45%, transparent);
   }
   60% {
-    box-shadow: 0 0 0 10px rgba(168, 127, 43, 0);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--needs) 0%, transparent);
   }
 }
+/* Landed. Leaf is the kit's working light, and this is the one that worked. */
 .slapbar--pending .slapbar__button:not(:disabled),
 .slapbar--pending .slapbar__button:not(:disabled):hover {
-  background: var(--green);
-  border-color: var(--green);
   animation: none;
 }
-.slapbar__hint {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--muted);
-  max-width: 22rem;
+.slapbar--pending .slapbar__button:not(:disabled)::before {
+  background: var(--working);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--working) 22%, transparent);
+}
+/*
+ * Queued: the slap is made and the table will come to it, but somebody else
+ * is picking first. Nothing to do, so nothing to press - the button goes
+ * quiet and keeps the ember dot, because the card is still owed.
+ */
+.slapbar--queued .slapbar__button::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--needs);
 }
 
 /* ------------------------------------------------------- the quiet screens */
 
 /*
  * Everything that is not the table - joining, waiting, scoring - is one narrow
- * column of paper in the middle of the window. Same width, same rhythm, so
- * moving between them feels like turning a page rather than changing app.
+ * column in the middle of the window. Same width, same rhythm, so moving
+ * between them feels like turning a page rather than changing app.
  */
 .home,
 .lobby,
 .over {
   width: 100%;
-  max-width: 27rem;
+  max-width: 28rem;
   /*
    * Centred in the window, horizontally and vertically. Auto margins in a flex
    * column only take up space that is going spare, so a tall lobby still
@@ -1280,12 +1368,16 @@ kbd {
   }
 }
 
+/* The one Light thing on the screen, which is what Light is for. */
 .home__title {
   font-size: clamp(2.6rem, 11vw, 3.6rem);
+  font-weight: 300;
+  letter-spacing: -0.04em;
   margin: 0;
   line-height: 1;
 }
 .home__tagline {
+  font: 400 15px/22px var(--sans);
   color: var(--muted);
   margin: 0.85rem 0 0;
   max-width: 24rem;
@@ -1310,10 +1402,8 @@ kbd {
   align-items: center;
   gap: 0.85rem;
   color: var(--faint);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  font: 500 12px/16px var(--sans);
+  letter-spacing: 0;
 }
 .home__divider::before,
 .home__divider::after {
@@ -1334,44 +1424,92 @@ kbd {
 
 /*
  * Three cards fanned out above the title: the only decoration in the whole
- * interface, and it is the thing the game is made of. They wear the default
- * back, and they lift a little when the page settles.
+ * interface, and it is the thing the game is made of.
+ *
+ * They are also the only thing on this screen you can play with. Each one is
+ * a real card - the same component the table deals, wearing the same back -
+ * so turning one over here is the same half-second flip it will be in a
+ * round, and what comes up is a card off a real pack.
  */
 .fan {
+  /* The fan sets its own card size; everything inside scales off these. */
+  --card-w: 68px;
+  --card-h: 96px;
   display: flex;
   justify-content: flex-start;
   align-items: flex-end;
   height: 104px;
   margin-bottom: 1.5rem;
-  perspective: 900px;
 }
-.fan span {
+/*
+ * The button is the card's frame: it carries the angle it sits at in the fan,
+ * the lift it takes on hover, and the perspective the flip inside it turns
+ * through. Two custom properties keep those separable - the resting angle
+ * belongs to the card's place in the fan, the rise to what the pointer is
+ * doing - so neither has to restate the other.
+ */
+.fan__card {
+  --fan-turn: 0deg;
+  --fan-rise: 0px;
+  --fan-lift: 0px;
   display: block;
-  width: 68px;
-  height: 96px;
-  border-radius: 5px;
-  background-color: #e9ebef;
-  background-image: var(--card-back, none);
-  background-size: cover;
-  background-position: center;
-  border: 1px solid rgba(22, 24, 29, 0.12);
-  box-shadow: var(--card-shadow);
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  perspective: 900px;
   transform-origin: 50% 120%;
-  animation: fan-in 700ms var(--ease-back) both;
+  transform: rotate(var(--fan-turn)) translateY(calc(var(--fan-rise) + var(--fan-lift)));
+  /* `backwards` holds the opening pose until the delay is up and then lets
+     go, so it never fights the hover transform afterwards. */
+  animation: fan-in 700ms var(--ease-back) backwards;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 260ms var(--ease-out);
 }
-.fan span:nth-child(1) {
-  transform: rotate(-13deg);
+.fan__card:nth-child(1) {
+  --fan-turn: -13deg;
   animation-delay: 60ms;
 }
-.fan span:nth-child(2) {
+.fan__card:nth-child(2) {
+  --fan-turn: 0deg;
+  --fan-rise: -6px;
   margin-left: -26px;
-  transform: rotate(0deg) translateY(-6px);
   animation-delay: 140ms;
 }
-.fan span:nth-child(3) {
+.fan__card:nth-child(3) {
+  --fan-turn: 13deg;
   margin-left: -26px;
-  transform: rotate(13deg);
   animation-delay: 220ms;
+}
+/*
+ * Only where there is a pointer to hover with. On a touch screen the lift
+ * would stick to whichever card was tapped last, which reads as a bug.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .fan__card:hover {
+    --fan-lift: -12px;
+  }
+  .fan__card:hover .card__face {
+    box-shadow: var(--card-shadow-lift);
+  }
+}
+.fan__card:active {
+  --fan-lift: -4px;
+}
+.fan__card:focus-visible {
+  outline: none;
+  border-radius: var(--r-chip);
+  box-shadow: var(--gl-ring);
+}
+/* The card inside sits flat in its frame; the frame does the moving. */
+.fan__card .card {
+  transition: none;
+}
+.fan__card .card__face {
+  transition: box-shadow 220ms var(--ease-out);
 }
 @keyframes fan-in {
   from {
@@ -1392,54 +1530,66 @@ kbd {
 .lobby__title {
   margin: 0;
   font-size: 2rem;
+  font-weight: 300;
+  letter-spacing: -0.03em;
   line-height: 1.1;
 }
-/* The code is the whole point of this screen, so it is set like a headline. */
+/*
+ * The code is the whole point of this screen, so it is set as a readout -
+ * Light, tabular, tracked - in a capsule of the same veil as every other
+ * control, and nothing else is in the capsule with it. It is a button, so it
+ * has no outline; that it copies is something it says when you press it
+ * rather than a word parked under the code for the life of the lobby.
+ */
 .code {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.15rem;
-  background: var(--paper);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r);
-  padding: 0.5rem 0.8rem;
+  align-items: center;
+  justify-content: center;
+  background: var(--gl-well);
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 0.6rem 1.3rem;
   cursor: pointer;
   color: inherit;
   font: inherit;
   box-shadow: var(--e1);
+  -webkit-tap-highlight-color: transparent;
   transition:
-    border-color 140ms var(--ease-io),
+    background 140ms var(--ease-io),
     box-shadow 160ms var(--ease-out),
-    transform 140ms var(--ease-out);
+    opacity 110ms var(--ease-io),
+    transform 90ms var(--ease-out);
 }
 .code:hover {
-  border-color: rgba(22, 24, 29, 0.3);
+  background: var(--gl-well-light);
   box-shadow: var(--e2);
-  transform: translateY(-1px);
+}
+.code:active {
+  opacity: 0.86;
+  transform: scale(0.97);
+}
+.code:focus-visible {
+  outline: none;
+  box-shadow: var(--gl-ring);
 }
 .code__value {
-  font: 600 1.45rem/1 var(--mono);
-  letter-spacing: 0.2em;
+  font: 300 1.5rem/1.1 var(--sans);
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
-  /* The tracking on the last glyph would otherwise push the block off centre. */
-  text-indent: 0.2em;
-}
-.code__hint {
-  font-size: 0.6rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--faint);
-  transition: color 160ms var(--ease-io);
-}
-.code:hover .code__hint {
-  color: var(--muted);
+  /*
+   * Tracking is added after every glyph, the last one included, so the text
+   * box is 0.16em wider on the right than the code looks. Taking that back
+   * puts the glyphs themselves in the middle of the capsule rather than the
+   * box they sit in.
+   */
+  margin-right: -0.16em;
 }
 
+
 .lobby__blurb {
+  font: 400 14px/20px var(--sans);
   color: var(--muted);
-  font-size: 0.88rem;
   margin: 0.9rem 0 0;
 }
 
@@ -1455,7 +1605,8 @@ kbd {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.7rem 0.1rem;
+  min-height: 56px;
+  padding: 0.6rem 0.1rem;
   border-bottom: 1px solid var(--line);
   animation: row-in 320ms var(--ease-out);
 }
@@ -1469,7 +1620,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-weight: 550;
+  font: 500 15px/20px var(--sans);
   color: var(--ink);
 }
 
@@ -1482,55 +1633,77 @@ kbd {
   border-bottom: 1px solid var(--line);
 }
 .setting__label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--faint);
+  font: 500 12px/16px var(--sans);
+  letter-spacing: 0;
+  color: var(--muted);
   flex: 0 0 4.5rem;
 }
 .setting__hint {
   margin: 0 0 0 auto;
-  font-size: 0.78rem;
+  font: 400 13px/18px var(--sans);
   color: var(--muted);
   text-align: right;
 }
+/*
+ * A setting whose hint is a sentence rather than a count. It drops to its own
+ * line and reads from the left, because a sentence that wraps while right
+ * aligned leaves its last word stranded out on the margin.
+ */
+.setting--said .setting__hint {
+  flex: 1 0 100%;
+  margin: 0.1rem 0 0;
+  text-align: left;
+}
 
-/* A segmented control: one choice, three stops, no borders between them. */
+/*
+ * A segmented control: one choice, a few stops on one quiet track, and the
+ * chosen one an ink capsule. Chosen is ink everywhere in this interface.
+ */
 .decks__choices {
   display: inline-flex;
-  padding: 3px;
+  padding: 4px;
   gap: 2px;
-  background: var(--sunk);
-  border-radius: 10px;
+  background: var(--gl-well);
+  border-radius: var(--r-pill);
+  box-shadow: var(--e1);
 }
 .decks__choice {
-  min-width: 2.3rem;
-  padding: 0.3rem 0.5rem;
+  min-width: 56px;
+  height: 32px;
+  padding: 0 16px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r-pill);
   background: transparent;
   color: var(--muted);
-  font: inherit;
-  font-weight: 650;
+  font: 500 13px/16px var(--sans);
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition:
     background 160ms var(--ease-io),
-    color 160ms var(--ease-io),
-    box-shadow 180ms var(--ease-out);
+    color 180ms var(--ease-io);
+}
+/* A stop whose label is a word rather than a digit. */
+.decks__choice--wide {
+  min-width: 0;
+  padding: 0 18px;
 }
 .decks__choice:not(:disabled):hover {
   color: var(--ink);
+}
+.decks__choice:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+  border-radius: var(--r-pill);
 }
 /* Everyone sees the table setting; only the host can move it. */
 .decks__choice:disabled {
   cursor: default;
 }
 .decks__choice--on {
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: var(--e1);
+  background: var(--ink);
+  color: #fff;
 }
 
 .backs {
@@ -1543,13 +1716,14 @@ kbd {
   gap: 0.45rem;
   margin-top: 0.6rem;
 }
+/* These are pictures of cards, so they are cut like cards and not like tiles. */
 .backs__choice {
   position: relative;
   aspect-ratio: 5 / 7;
   padding: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  background-color: #e9ebef;
+  border: 1px solid var(--gl-hair-strong);
+  border-radius: 6px;
+  background-color: var(--card-back-ground);
   background-size: cover;
   background-position: center;
   cursor: pointer;
@@ -1565,10 +1739,15 @@ kbd {
   transform: translateY(-3px);
   box-shadow: var(--e2);
 }
+.backs__choice:focus-visible {
+  outline: none;
+  box-shadow: var(--gl-ring);
+}
 /*
  * The art carries its own pale border, so the mark for the chosen back is held
  * off the card and drawn around it - a ring printed on the artwork would be
- * invisible against the gold and yellow backs.
+ * invisible against the gold and yellow backs. The mark itself is the kit's
+ * selected state: ink, with a check in it.
  */
 .backs__choice--on {
   box-shadow: 0 0 0 2px var(--ink);
@@ -1576,11 +1755,13 @@ kbd {
 .backs__choice--on::after {
   content: "";
   position: absolute;
-  inset: auto -4px -4px auto;
-  width: 13px;
-  height: 13px;
+  inset: auto -5px -5px auto;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
-  background: var(--ink) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.2 2.2 4.8-4.8' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px no-repeat;
+  background: var(--ink)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")
+    center / 11px no-repeat;
   animation: pop 240ms var(--ease-back);
 }
 @keyframes pop {
@@ -1601,8 +1782,8 @@ kbd {
 }
 .lobby__waiting {
   flex: 1 1 12rem;
+  font: 400 14px/20px var(--sans);
   color: var(--muted);
-  font-size: 0.9rem;
   margin: 0;
   align-self: center;
 }
@@ -1611,13 +1792,15 @@ kbd {
 
 .over__title {
   font-size: clamp(1.9rem, 8vw, 2.6rem);
+  font-weight: 300;
+  letter-spacing: -0.03em;
   margin: 0 0 0.3rem;
   line-height: 1.1;
 }
 .over__sub {
   margin: 0 0 1.6rem;
+  font: 400 14px/20px var(--sans);
   color: var(--muted);
-  font-size: 0.88rem;
 }
 .over__scores {
   list-style: none;
@@ -1652,40 +1835,44 @@ kbd {
 .over__row:nth-child(6) {
   animation-delay: 410ms;
 }
+/* The winner is the lit row of this list, as the player on turn is of the table. */
 .over__row--win {
-  background: linear-gradient(90deg, var(--brass-soft), rgba(168, 127, 43, 0));
-  box-shadow: inset 2px 0 0 var(--brass);
-  padding-left: 0.7rem;
-  margin-left: -0.7rem;
+  background: var(--gl-lit);
+  box-shadow: var(--gl-lit-edge);
+  border-bottom-color: transparent;
+  border-radius: var(--r-card);
+  padding-left: 1rem;
+  padding-right: 1rem;
+  margin-left: -1rem;
+  margin-right: -1rem;
 }
 .over__rank {
-  font-family: var(--serif);
+  font: 300 1.1rem/1.2 var(--sans);
   color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
 .over__row--win .over__rank {
-  color: #8a6720;
+  color: var(--ink);
 }
 .over__name {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-weight: 550;
+  font: 500 15px/20px var(--sans);
   color: var(--ink);
   flex-wrap: wrap;
 }
 .over__cards {
   display: block;
-  font: 0.72rem/1.4 var(--mono);
+  font: 400 12px/1.5 var(--sans);
   color: var(--faint);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   margin-top: 0.15rem;
   flex-basis: 100%;
 }
 .over__score {
-  font-family: var(--serif);
-  font-size: 1.3rem;
-  font-weight: 600;
+  font: 300 1.5rem/1.1 var(--sans);
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
   min-width: 2ch;
@@ -1704,8 +1891,8 @@ kbd {
 .over__waiting {
   flex: 1 1 12rem;
   margin: 0;
+  font: 400 14px/20px var(--sans);
   color: var(--muted);
-  font-size: 0.9rem;
 }
 
 /* ----------------------------------------------------------------- toasts */
@@ -1724,14 +1911,15 @@ kbd {
   max-width: calc(100vw - 32px);
 }
 .toast {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.55rem 1.05rem;
-  font-weight: 550;
-  font-size: 0.86rem;
+  background: var(--gl-sheet-solid);
+  -webkit-backdrop-filter: blur(30px) saturate(1.2);
+  backdrop-filter: blur(30px) saturate(1.2);
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 0.6rem 1.2rem;
+  font: 500 14px/20px var(--sans);
   color: var(--ink);
-  box-shadow: var(--e3);
+  box-shadow: var(--gl-sheet-edge), var(--e3);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1740,17 +1928,18 @@ kbd {
 /* A dot carries the verdict, so the text can stay the same colour as the page. */
 .toast::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--faint);
   flex: none;
 }
 .toast--good::before {
-  background: var(--green);
+  background: var(--working);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--working) 22%, transparent);
 }
 .toast--bad::before {
-  background: var(--red);
+  background: var(--needs);
 }
 @keyframes toast-in {
   from {
@@ -1780,11 +1969,14 @@ kbd {
   gap: 0.6rem;
 }
 
+/* What is behind a sheet recedes: it goes back and out of focus. */
 .help__scrim {
   position: fixed;
   inset: 0;
   z-index: 29;
-  background: rgba(22, 24, 29, 0.14);
+  background: var(--gl-recede);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   animation: help-scrim 180ms var(--ease-out);
 }
 @keyframes help-scrim {
@@ -1793,48 +1985,67 @@ kbd {
   }
 }
 
+/* An icon button: a veil circle, 42 across, with its target out to 48. */
 .help__button {
-  font: 600 1rem/1 var(--serif);
-  font-style: italic;
-  width: 2.1rem;
-  height: 2.1rem;
-  border-radius: 999px;
-  border: 1px solid var(--line-strong);
-  background: var(--paper);
-  color: var(--muted);
+  position: relative;
+  display: grid;
+  place-items: center;
+  font: 500 1rem/1 var(--sans);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--gl-well);
+  color: var(--ink);
   cursor: pointer;
   box-shadow: var(--e1);
+  -webkit-tap-highlight-color: transparent;
   transition:
     color 140ms var(--ease-io),
-    border-color 140ms var(--ease-io),
+    background 140ms var(--ease-io),
     box-shadow 160ms var(--ease-out),
-    transform 140ms var(--ease-out);
+    opacity 110ms var(--ease-io),
+    transform 90ms var(--ease-out);
+}
+.help__button::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
 }
 .help__button:hover {
-  color: var(--ink);
-  border-color: rgba(22, 24, 29, 0.28);
+  background: var(--gl-well-light);
   box-shadow: var(--e2);
-  transform: translateY(-1px);
+}
+.help__button:active {
+  opacity: 0.86;
+  transform: scale(0.95);
 }
 .help__button:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--gl-ring);
 }
 .help__button[aria-expanded="true"] {
   background: var(--ink);
-  border-color: var(--ink);
   color: #fff;
 }
 
+/*
+ * A sheet: the one rising surface. It floats, with four round corners of its
+ * own, and it is made of the same glass as everything else that is raised.
+ */
 .help__panel {
+  position: relative;
   width: min(27rem, calc(100vw - 2.2rem));
   max-height: min(34rem, calc(100vh - 6rem));
   display: flex;
   flex-direction: column;
-  background: var(--paper);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  box-shadow: var(--e3);
+  background: var(--gl-sheet-solid);
+  -webkit-backdrop-filter: blur(30px) saturate(1.2);
+  backdrop-filter: blur(30px) saturate(1.2);
+  border: 0;
+  border-radius: var(--r-sheet);
+  box-shadow: var(--gl-sheet-edge), var(--e3);
   overflow: hidden;
   transform-origin: bottom right;
   animation: help-open 200ms var(--ease-out);
@@ -1845,47 +2056,69 @@ kbd {
     transform: translateY(6px) scale(0.98);
   }
 }
+/*
+ * The sheet's bottom edge is where its own light pools, so the rules dissolve
+ * into it rather than being cut off by the corner on the way past.
+ */
+.help__panel::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3rem;
+  pointer-events: none;
+  background: linear-gradient(rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.92));
+}
 
 .help__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.7rem 0.7rem 0.7rem 1.1rem;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  padding: 1.1rem 1.1rem 0.8rem 1.75rem;
+  flex: none;
 }
 .help__title {
   margin: 0;
-  font: 600 0.95rem/1.2 var(--serif);
-  letter-spacing: 0.01em;
+  font: 500 1.15rem/1.2 var(--sans);
+  letter-spacing: -0.03em;
 }
 
 .help__body {
   overflow-y: auto;
-  padding: 0.3rem 1.1rem 1.1rem;
-  font-size: 0.86rem;
+  /*
+   * It scrolls, but it does not advertise it. A bar down the edge of a sheet
+   * this small is more furniture than the page can afford, and the light
+   * pooling along the bottom edge already says there is more below.
+   */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 0.3rem 1.75rem 1.75rem;
+  font: 400 14px/20px var(--sans);
   color: var(--text);
 }
+.help__body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
 .help__body p {
-  margin: 0.45rem 0;
+  margin: 0.5rem 0;
 }
 
-/* Each section is announced by a rule and a small caps line, not a heading. */
+/* Each section is announced by a hairline and a caption, not a heading. */
 .help__h {
-  margin: 1.15rem 0 0.3rem;
-  font-size: 0.66rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--faint);
-  padding-top: 0.7rem;
+  margin: 1.3rem 0 0.35rem;
+  font: 500 12px/16px var(--sans);
+  letter-spacing: 0;
+  color: var(--muted);
+  padding-top: 0.8rem;
   border-top: 1px solid var(--line);
 }
 .help__body > .help__h:first-child {
   border-top: none;
   padding-top: 0;
-  margin-top: 0.7rem;
+  margin-top: 0.4rem;
 }
 
 /* Two columns for anything that is a lookup: a rank, then what it is worth. */
@@ -1897,13 +2130,55 @@ kbd {
   align-items: baseline;
 }
 .help__pairs dt {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink);
   white-space: nowrap;
 }
 .help__pairs dd {
   margin: 0;
   color: var(--muted);
+}
+
+/* A caption under a heading, saying what the table below it is for. */
+.help__lede {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+
+/*
+ * Everything that is not a lookup is a short list of sentences. Prose in a
+ * rule book is read once and skipped forever; a line you can find again in two
+ * seconds mid-round is the only kind worth having on this sheet.
+ */
+.help__list {
+  margin: 0.4rem 0;
+  padding-left: 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.34rem;
+}
+.help__list li::marker {
+  color: var(--faint);
+}
+.help__list strong {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.help__pairs--tight {
+  gap: 0.2rem 0.9rem;
+}
+/* The suits beside a king, so its two prices can be told apart at a glance. */
+.help__suit {
+  margin-left: 0.18em;
+  font-size: 0.9em;
+  letter-spacing: -0.04em;
+}
+.help__suit--red {
+  color: var(--card-red);
+}
+.help__suit--black {
+  color: var(--faint);
 }
 
 .help__steps {
@@ -1971,7 +2246,7 @@ kbd {
     gap: 0.3rem;
   }
   .seat__name {
-    font-size: 0.72rem;
+    font-size: 12px;
   }
   .piles {
     gap: calc(var(--card-w) * 0.38);
@@ -1980,11 +2255,30 @@ kbd {
   .tablelog {
     display: none;
   }
-  .slapbar {
-    flex: 1 1 100%;
+  .table__bar {
+    gap: 0.5rem;
+    padding-bottom: 0.4rem;
   }
-  .table__buttons {
-    margin-left: 0;
+  .table__code {
+    padding: 0.3rem 0.6rem;
+  }
+  .table__status {
+    font-size: 13px;
+  }
+  .table__controls {
+    gap: 0.4rem;
+    padding-top: 0.45rem;
+  }
+  /* The slap button keeps its size; everything beside it gives way first. */
+  .slapbar__button {
+    min-width: 6.5rem;
+    min-height: 44px;
+    padding: 0.6rem 1.1rem;
+  }
+  .table__buttons .button {
+    min-height: 44px;
+    padding: 0.55rem 0.9rem;
+    font-size: 13px;
   }
   .backs__choices {
     grid-template-columns: repeat(4, 1fr);
@@ -1996,6 +2290,7 @@ kbd {
   }
   .help__panel {
     max-height: calc(100vh - 4.5rem);
+    border-radius: 40px;
   }
 }
 

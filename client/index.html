@@ -1,15 +1,30 @@
 <!doctype html>
-<html lang="en">
+<!--
+  The theme lives in two words. data-tint is the colourway and data-ground is
+  the surface the page stands on; both are listed in src/theme.css, which is
+  the only file in the client with a colour in it.
+-->
+<html lang="en" data-tint="slate" data-ground="sheet">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f4f3ef" />
+    <meta name="theme-color" content="#d4d4d7" />
     <meta name="description" content="Cambio - the card game where the lowest hand wins and you do not know your own cards." />
     <title>Cambio</title>
-    <!-- The page is painted before the stylesheet lands, so it starts the right colour. -->
+    <!--
+      The two weights the first screen is set in. 300 is used in two places
+      and can afford to arrive with the stylesheet.
+    -->
+    <link rel="preload" href="/fonts/CommitMono-500.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/CommitMono-400.woff2" as="font" type="font/woff2" crossorigin />
+    <!--
+      The page is painted before the stylesheet lands, so it starts the right
+      colour. This is the flat middle of the chosen ground - keep it in step
+      with --gl-ground-flat if you change data-tint above.
+    -->
     <style>
       html {
-        background: #f4f3ef;
+        background: #d4d4d7;
       }
     </style>
   </head>

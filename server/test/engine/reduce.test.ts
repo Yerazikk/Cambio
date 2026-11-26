@@ -220,6 +220,42 @@ describe("powers", () => {
     return ok(ok(state, "ana", { a: "drawDeck" }), "ana", { a: "discardDrawn" });
   }
 
+  /** The same, at a table whose host has made powers optional. */
+  function triggerOptional(card: string) {
+    const state = fixture({
+      hands: { ana: ["S2", "S3", "S4", "S5"], bo: ["C2", "C3", "C4", "C5"], cy: ["D6", "D7"] },
+      discard: ["D2"],
+      deck: [card],
+      rules: { optionalPowers: true },
+    });
+    return ok(ok(state, "ana", { a: "drawDeck" }), "ana", { a: "discardDrawn" });
+  }
+
+  describe("using one is not a choice", () => {
+    it("refuses to let a power be declined", () => {
+      expect(rejected(trigger("S7"), "ana", { a: "forfeitPower" })).toBe("illegalAction");
+      expect(rejected(trigger("S12"), "ana", { a: "forfeitPower" })).toBe("illegalAction");
+    });
+
+    it("refuses to let a king look and then keep both cards", () => {
+      const peeked = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
+      expect(rejected(peeked, "ana", { a: "kingSkip" })).toBe("illegalAction");
+    });
+
+    it("lets the turn clock walk away from one, because a clock is not a player", () => {
+      const state = ok(trigger("S7"), "ana", { a: "powerTimeout" });
+      expect(state.phase).toBe("awaitingAction");
+      expect(state.turnIndex).toBe(1);
+      expect(state.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
+    });
+
+    it("gives the choice back when the host asks for it", () => {
+      const state = ok(triggerOptional("S7"), "ana", { a: "forfeitPower" });
+      expect(state.phase).toBe("awaitingAction");
+      expect(state.turnIndex).toBe(1);
+    });
+  });
+
   describe("seven and eight: look at your own card", () => {
     it("enters the peek-own phase", () => {
       for (const card of ["S7", "S8"]) {
@@ -380,8 +416,8 @@ describe("powers", () => {
       expect(rejected(state, "bo", { a: "freeSwap", aId: "bo", aSlot: 0, bId: "ana", bSlot: 0 })).toBe("notYourTurn");
     });
 
-    it("may be declined like any other power", () => {
-      const state = ok(trigger("S12"), "ana", { a: "forfeitPower" });
+    it("may be declined like any other power, where the host allows it", () => {
+      const state = ok(triggerOptional("S12"), "ana", { a: "forfeitPower" });
       expect(state.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
       expect(state.phase).toBe("awaitingAction");
       expect(state.turnIndex).toBe(1);
@@ -436,8 +472,8 @@ describe("powers", () => {
       expect(rejected(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "ana", bSlot: 0 })).toBe("badTarget");
     });
 
-    it("passes after looking, leaving hands untouched", () => {
-      const peeked = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
+    it("passes after looking, leaving hands untouched, where the host allows it", () => {
+      const peeked = ok(triggerOptional("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
       const state = ok(peeked, "ana", { a: "kingSkip" });
 
       expect(state.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
@@ -446,7 +482,7 @@ describe("powers", () => {
     });
 
     it("insists you look before you swap or pass", () => {
-      const state = trigger("S13");
+      const state = triggerOptional("S13");
       expect(rejected(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "bo", bSlot: 0 })).toBe(
         "illegalAction",
       );

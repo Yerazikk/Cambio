@@ -39,9 +39,13 @@ export class Player {
     return this.page.getByTestId("prompt").innerText();
   }
 
+  /**
+   * Whose turn it is, read off the table rather than off the prompt. The
+   * prompt says nothing when your turn simply starts - there is nothing to
+   * say - so the table carries the fact as an attribute instead.
+   */
   async isMyTurn(): Promise<boolean> {
-    const text = await this.prompt();
-    return text.startsWith("Your turn");
+    return (await this.page.getByTestId("table").getAttribute("data-my-turn")) !== null;
   }
 
   /** My own hand's slots, in order. */
@@ -51,6 +55,11 @@ export class Player {
 
   slotOf(playerName: string, index: number) {
     return this.page.getByTestId(`slot-${playerName}-${index}`);
+  }
+
+  /** The table is stopped on somebody's slap. */
+  async isStopped(): Promise<boolean> {
+    return (await this.page.getByTestId("table").getAttribute("data-stopped")) !== null;
   }
 
   async close(): Promise<void> {

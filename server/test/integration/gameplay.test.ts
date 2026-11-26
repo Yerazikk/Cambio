@@ -24,9 +24,27 @@ async function takeSafeTurn(clients: TestClient[]): Promise<void> {
   actor.act({ a: "discardDrawn" });
   const after = await actor.waitForState((v) => v.phase !== "holdingCard");
 
-  // A discarded power card has to be resolved before the turn can pass.
+  // A discarded power card has to be resolved before the turn can pass - and
+  // at this table it cannot be declined, so the driver plays it out.
   if (after.pendingPower !== null) {
-    actor.act({ a: "forfeitPower" });
+    const others = clients.filter((c) => c.playerId !== actor.playerId);
+    const other = others[0]!;
+    switch (after.pendingPower) {
+      case "peekOwn":
+        actor.act({ a: "peekOwn", slot: 0 });
+        break;
+      case "peekOther":
+        actor.act({ a: "peekOther", playerId: other.playerId, slot: 0 });
+        break;
+      case "freeSwap":
+        actor.act({ a: "freeSwap", aId: actor.playerId, aSlot: 0, bId: actor.playerId, bSlot: 1 });
+        break;
+      case "king":
+        actor.act({ a: "peekOther", playerId: other.playerId, slot: 0 });
+        await actor.waitForState((v) => v.kingPeeked || v.pendingPower === null);
+        actor.act({ a: "freeSwap", aId: actor.playerId, aSlot: 0, bId: actor.playerId, bSlot: 1 });
+        break;
+    }
     await actor.waitForState((v) => v.pendingPower === null);
   }
 }

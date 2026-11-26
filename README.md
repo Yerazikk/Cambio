@@ -22,13 +22,20 @@ triggers it:
 | 7, 8 | Look at one of your own cards |
 | 9, 10 | Look at one of another player's cards |
 | J, Q | Swap any two cards on the table — two of yours, two of theirs, or one of each |
-| K | Look at any card, then swap any two cards - or pass |
+| K | Look at any card, then swap any two cards |
 
 A card taken from the discard pile grants no power — it must go into your hand.
-Powers are optional; you may decline one.
 
-**Decks.** The host picks one, two, or three packs before the round starts. More
+**A power you trigger is a power you use** — there is no declining one. The
+host can turn that off in the lobby before the round, which makes every power
+an offer instead; the rule book on the table says which of the two is being
+played.
+
+**Decks.** The host picks one to four packs before the round starts. More
 packs means more of every rank on the table, so slaps come up far more often.
+
+**Powers.** The host also chooses, before the round, whether a triggered power
+has to be used. It must by default.
 
 **Cards.** The host also picks the back the table plays with. It is purely
 cosmetic - every card wears the same one, so it gives nothing away - and it can
@@ -44,10 +51,18 @@ top, you can slap it. Hit your own and it leaves your hand. Hit someone else's
 and theirs is discarded, but you owe them one of yours. Get the rank wrong and
 you take a penalty card. Empty your hand and the round ends on the spot.
 
+Slapping stops the table. From the moment you slap, nobody draws and nobody
+plays until you have turned a card over — and the clock on the turn you
+interrupted is held where it was, so nobody loses their turn to your slap. Take
+longer than eight seconds to pick and it costs you a card, which is what stops
+SLAP from being a free way to freeze the game.
+
 Slapping at the same moment as somebody else is a queue, not a duel: a faster
 slap does not cancel a slower one, it only goes first. If the slap ahead of
-yours was right, the queue stops there and yours costs you nothing. If it was
-wrong, the slapper takes their penalty and yours is played out next.
+yours was right, the queue stops there and yours costs you nothing — you are
+never even asked to pick. If it was wrong, that player takes their penalty and
+the table turns to you, and now you have to turn a card over while everyone
+waits.
 
 **Calling Cambio.** Instead of drawing, call Cambio. Everyone else takes one
 final turn, then all hands are revealed. Lowest total wins, and the caller wins
@@ -71,10 +86,32 @@ can grow without crowding its neighbour.
 
 ### How it is drawn
 
-The table is white: paper for the surface, ink for everything you read, and a
-hairline wherever a lesser screen would put a box. The only coloured things on
-it are the cards, and the four marks that mean something - brass for whose turn
-it is, green for a card you have chosen, blue for a trade, red for a slap.
+The table wears the Yass kit (Natural OS 3.0). Ink carries every decision, the
+accent only ever marks what is live, ember says "needs you" and leaf says
+"working", and all of it stands on a soft ground with a bloom in two corners.
+Nothing you can touch has an outline - it has a veil fill and a capsule edge -
+and nothing has a corner under 24. The type is Inter at 500, 300 for the one
+big thing on a screen, 400 for running text; there is no bold anywhere.
+
+So the only coloured things on the table are the cards themselves, which are
+printed objects and keep their own white and their own red, and the three marks
+that mean something: the accent for a card that is live and yours to click, ink
+for one you have chosen - chosen is never a colour - and ember for a slap or a
+penalty. Whose turn it is, and who won the round, are said the kit's way: one
+row is lit at a time, and it is the brightest thing on the screen.
+
+**Changing the theme is two words.** `client/src/theme.css` is the only file in
+the client with a colour in it, and `client/index.html` picks from it:
+
+```html
+<html lang="en" data-tint="moss" data-ground="sheet">
+```
+
+`data-tint` is the colourway - `moss`, `blue`, `gold`, `violet`, `rose`, `sea`
+or `slate` - and `data-ground` is the surface the page stands on: `sheet`,
+`air` or `cool`. A colourway is six hex values; everything else on the page,
+from the ground ramp to every shadow, is worked out from those six, so a new
+theme is a seven-line block in part 1 of that file.
 
 A card is an object with two sides rather than two pieces of markup. Face up or
 face down is one class on its frame, and inside the frame the two faces sit back

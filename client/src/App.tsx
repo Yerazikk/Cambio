@@ -57,8 +57,10 @@ export function Game({ game }: { game: GameStore }): React.JSX.Element {
           onKick={game.kick}
           onDecks={game.setDecks}
           onBack={game.setBack}
+          onPowers={game.setPowers}
           onStart={game.start}
           onLeave={game.leave}
+          onNotify={game.notify}
         />
       ) : view.phase === "finished" ? (
         <GameOver view={view} me={me} onRestart={game.restart} onLeave={game.leave} />
@@ -74,7 +76,7 @@ export function Game({ game }: { game: GameStore }): React.JSX.Element {
           log={game.log}
           act={game.act}
           slap={game.slap}
-          armSlap={game.armSlap}
+          claimSlap={game.claimSlap}
           setPick={game.setPick}
           revealFor={game.revealFor}
           flashFor={game.flashFor}
@@ -86,7 +88,7 @@ export function Game({ game }: { game: GameStore }): React.JSX.Element {
       <Toasts toasts={game.toasts} />
 
       {/* The rule book sits in the corner of every screen, lobby included. */}
-      <RulesHelp open={helpOpen} onOpenChange={setHelpOpen} />
+      <RulesHelp open={helpOpen} onOpenChange={setHelpOpen} optionalPowers={view?.optionalPowers ?? false} />
     </div>
   );
 }

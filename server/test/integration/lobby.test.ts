@@ -247,7 +247,7 @@ describe("starting the game", () => {
     const { clients } = await h.table(["Ana", "Bo"]);
     await clients[1]!.waitForState((v) => v.players.length === 2);
 
-    for (const decks of [0, 4, 2.5]) {
+    for (const decks of [0, 5, 2.5]) {
       clients[0]!.send({ t: "lobby.decks", decks });
       const error = await clients[0]!.next("error");
       expect(error.code, String(decks)).toBe("malformed");
@@ -265,6 +265,50 @@ describe("starting the game", () => {
     const error = await clients[0]!.next("error");
     expect(error.code).toBe("illegalAction");
     expect(clients[0]!.latestState()?.decks).toBe(1);
+  });
+
+  it("makes powers compulsory unless the host says otherwise", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    const view = await clients[1]!.waitForState((v) => v.players.length === 2);
+    expect(view.optionalPowers).toBe(false);
+  });
+
+  it("lets the host make powers optional, and tells the whole table", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    clients[0]!.send({ t: "lobby.powers", optional: true });
+
+    for (const client of clients) {
+      const view = await client.waitForState((v) => v.optionalPowers);
+      expect(view.optionalPowers).toBe(true);
+    }
+  });
+
+  it("will not let a guest change the rules", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    await clients[1]!.waitForState((v) => v.players.length === 2);
+
+    clients[1]!.send({ t: "lobby.powers", optional: true });
+
+    const error = await clients[1]!.next("error");
+    expect(error.code).toBe("notHost");
+    expect(clients[1]!.latestState()?.optionalPowers).toBe(false);
+  });
+
+  it("refuses to change the rules once the round is under way", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    clients[0]!.send({ t: "lobby.start" });
+    await clients[0]!.waitForState((v) => v.phase === "study");
+
+    clients[0]!.send({ t: "lobby.powers", optional: true });
+    const error = await clients[0]!.next("error");
+    expect(error.code).toBe("illegalAction");
+    expect(clients[0]!.latestState()?.optionalPowers).toBe(false);
   });
 
   it("starts on the default card back", async () => {

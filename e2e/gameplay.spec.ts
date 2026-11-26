@@ -159,7 +159,7 @@ test.describe("calling Cambio", () => {
 
     const next = await currentPlayer(players);
     await expect(next.page.getByTestId("cambio-button")).toHaveCount(0);
-    await expect(next.page.getByTestId("prompt")).toContainText(/your turn/i);
+    await expect(next.page.getByTestId("table")).toHaveAttribute("data-my-turn", "");
 
     for (const player of players) await player.close();
   });

@@ -28,10 +28,10 @@ export const MAX_PLAYERS = 6;
 export const CARDS_PER_DECK = 54;
 export const DECKS = 1;
 export const MIN_DECKS = 1;
-export const MAX_DECKS = 3;
+export const MAX_DECKS = 4;
 
 /** The deck counts a host may choose between, for a picker to render. */
-export const DECK_CHOICES: readonly number[] = [1, 2, 3];
+export const DECK_CHOICES: readonly number[] = [1, 2, 3, 4];
 
 /**
  * The card backs on offer. Purely cosmetic - the back is the same for every
@@ -70,6 +70,16 @@ export function isCardBack(id: string): boolean {
 export const SLAP_WINDOW_MS = 200;
 
 /**
+ * How long the holder of the slap lock has to name a card before the table
+ * takes one off them and moves on.
+ *
+ * Slapping stops the game: everybody waits while the slapper picks. That is
+ * the rule, so it needs a clock - and it needs a cost on the far side of it,
+ * or pressing SLAP would be a free way to freeze the table.
+ */
+export const SLAP_PICK_MS = 8_000;
+
+/**
  * How long a peeked card stays face up on the peeker's screen. Cambio is a
  * memory game: the card is shown once and then never re-sent, so this is the
  * only window in which the player can commit it to memory.
@@ -78,6 +88,21 @@ export const PEEK_MS = 4_000;
 
 /** Per-turn clock. On expiry the server auto-plays a safe move. */
 export const TURN_MS = 45_000;
+
+/**
+ * Whether a power may be declined.
+ *
+ * false — the default, and the game as it is meant to be played. Discarding a
+ *         card straight from the deck fires its power and you resolve it:
+ *         you look, or you swap. A seven you did not want is part of the
+ *         price of discarding a seven.
+ * true  — powers are offered rather than imposed, and may be waved away.
+ *
+ * The host chooses in the lobby, before the round. It changes how the turn
+ * plays more than any other setting, so it is table-wide and fixed for the
+ * round rather than something a player decides each time.
+ */
+export const OPTIONAL_POWERS = false;
 
 /** Added to the caller's score when they call Cambio without the lowest hand. */
 export const CAMBIO_PENALTY = 10;
@@ -120,9 +145,11 @@ export type RuleConfig = {
   handSize: number;
   initialPeeks: number;
   slapWindowMs: number;
+  slapPickMs: number;
   peekMs: number;
   turnMs: number;
   cambioPenalty: number;
+  optionalPowers: boolean;
   slapAfterCambio: boolean;
   serverRemembersPeeks: boolean;
 };
@@ -132,9 +159,11 @@ export const DEFAULT_RULES: RuleConfig = {
   handSize: HAND_SIZE,
   initialPeeks: INITIAL_PEEKS,
   slapWindowMs: SLAP_WINDOW_MS,
+  slapPickMs: SLAP_PICK_MS,
   peekMs: PEEK_MS,
   turnMs: TURN_MS,
   cambioPenalty: CAMBIO_PENALTY,
+  optionalPowers: OPTIONAL_POWERS,
   slapAfterCambio: SLAP_AFTER_CAMBIO,
   serverRemembersPeeks: SERVER_REMEMBERS_PEEKS,
 };

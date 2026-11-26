@@ -1,0 +1,361 @@
+/*
+ * ============================================================================
+ *  THE THEME.  This is the only file with colours in it.
+ * ============================================================================
+ *
+ * Cambio wears the Yass kit (Natural OS 3.0): ink for every decision, one
+ * accent that only ever marks what is active, ember for "needs you", leaf for
+ * "working", and a soft ground with a bloom in two corners. Corners are 60 /
+ * 48 / 36 / 24 and never smaller; anything you touch is a capsule or a circle;
+ * controls have a veil fill instead of an outline; the type is Commit Mono at
+ * two weights, 500 and 300, with 400 for running text. Never bold.
+ *
+ *  -------------------------------------------------------------------------
+ *  TO CHANGE THE THEME, edit one word in client/index.html:
+ *
+ *      <html lang="en" data-tint="slate" data-ground="sheet">
+ *
+ *  data-tint   slate (the current one) · moss · blue · gold · violet · rose · sea
+ *  data-ground sheet (the current one) · air · cool
+ *  -------------------------------------------------------------------------
+ *
+ * A colourway is six colours; everything else on the page - the ground ramp
+ * and its two blooms, the text alphas, the hairlines, the sheet, the lit sweep
+ * under whoever's turn it is, every shadow - is worked out from those six by
+ * the derivation in part 3. So a new theme is six hex values: add a block in
+ * part 1, name it in index.html, and the rest follows.
+ *
+ * Ember and leaf are deliberately not part of a colourway. They are status -
+ * needs you, working - and a status has to mean the same thing in every theme,
+ * so they stay put in part 2 along with the things that are printed rather
+ * than themed: the white of a card and the red of a heart.
+ *
+ * Layout:  1 the colourways   2 what never changes   3 the derivation
+ *          4 Cambio's own names, pointed at the tokens
+ */
+
+/*
+ * Commit Mono, self-hosted, in the three weights the interface uses and no
+ * more. It is a monospace face, which is the point: every number on this
+ * screen is a count that changes - cards left in the deck, seconds left on the
+ * turn, a score being totted up - and in a proportional face each of those
+ * twitches sideways as it counts. Here they do not move at all.
+ *
+ * Latin only, and one file per weight: there is no variable cut, and three
+ * subsets at ~47KB come to less than the variable Inter they replace.
+ * SIL Open Font License 1.1 - the licence ships beside them in /fonts.
+ */
+@font-face {
+  font-family: "Commit Mono";
+  src: url("/fonts/CommitMono-300.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Commit Mono";
+  src: url("/fonts/CommitMono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Commit Mono";
+  src: url("/fonts/CommitMono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ======================================================= 1 · THE COLOURWAYS
+ *
+ *  ink         the near-black every word and every Ink button is painted in
+ *  mist        the mid grey the ground's far end runs towards
+ *  accent      focus rings, the caret, the selection, a live target
+ *  ground      the middle of the ground ramp: the colour the theme reads as
+ *  bloom-warm  the warm corner, bottom-right
+ *  bloom-cool  the cooler bloom on the left
+ */
+
+/* Moss. The accent is olive rather than a true green on purpose: leaf
+   (#52D98C) is the working light, and a mint accent on a sage ground would
+   blur the two together. */
+html[data-tint="moss"] {
+  --tint-ink: #1d2317;
+  --tint-mist: #8a9b7d;
+  --tint-accent: #7c9a46;
+  --tint-ground: #c3cdb7;
+  --tint-bloom-warm: #e8e0cc;
+  --tint-bloom-cool: #c2d2c8;
+}
+/* pre-paint: #d1d9c8  (the flat middle of this ground - index.html carries a copy) */
+
+/* The kit as it ships. */
+html[data-tint="blue"] {
+  --tint-ink: #192233;
+  --tint-mist: #8595ac;
+  --tint-accent: #6892f8;
+  --tint-ground: #bdc8d7;
+  --tint-bloom-warm: #ecd7d5;
+  --tint-bloom-cool: #bac9e0;
+}
+/* pre-paint: #cdd5e1  (the flat middle of this ground - index.html carries a copy) */
+
+html[data-tint="gold"] {
+  --tint-ink: #272015;
+  --tint-mist: #a59475;
+  --tint-accent: #c98a2e;
+  --tint-ground: #d4c9b0;
+  --tint-bloom-warm: #f3e7cb;
+  --tint-bloom-cool: #cdceb2;
+}
+/* pre-paint: #ded6c3  (the flat middle of this ground - index.html carries a copy) */
+
+html[data-tint="violet"] {
+  --tint-ink: #251c33;
+  --tint-mist: #9f8ab2;
+  --tint-accent: #a077f2;
+  --tint-ground: #ccc2d9;
+  --tint-bloom-warm: #eed6e7;
+  --tint-bloom-cool: #c7c1e6;
+}
+/* pre-paint: #d8d1e2  (the flat middle of this ground - index.html carries a copy) */
+
+html[data-tint="rose"] {
+  --tint-ink: #311c25;
+  --tint-mist: #ac8595;
+  --tint-accent: #d4688f;
+  --tint-ground: #d5bcc2;
+  --tint-bloom-warm: #f2dad8;
+  --tint-bloom-cool: #d9c6e0;
+}
+/* pre-paint: #dfccd1  (the flat middle of this ground - index.html carries a copy) */
+
+html[data-tint="sea"] {
+  --tint-ink: #17282d;
+  --tint-mist: #7f9ea5;
+  --tint-accent: #2fa3b5;
+  --tint-ground: #b5cbcf;
+  --tint-bloom-warm: #e6dcd2;
+  --tint-bloom-cool: #b6cfe0;
+}
+/* pre-paint: #c7d7db  (the flat middle of this ground - index.html carries a copy) */
+
+/* Slate, and the default if no data-tint is set. The no-colourway colourway:
+   a neutral ground, and the accent is the only colour on the page - which is
+   what a table of playing cards wants, since the cards carry all of it. */
+:root,
+html[data-tint="slate"] {
+  --tint-ink: #202022;
+  --tint-mist: #95959a;
+  --tint-accent: #6892f8;
+  --tint-ground: #c7c7cb;
+  --tint-bloom-warm: #e4dedc;
+  --tint-bloom-cool: #cfd2da;
+}
+/* pre-paint: #d4d4d7  (the flat middle of this ground - index.html carries a copy) */
+
+/* =================================================== 2 · WHAT NEVER CHANGES */
+
+:root {
+  /* ---- status. The same in every colourway, because a status that changed
+          colour with the theme would stop being a status. */
+  --gl-ember: #ff765a; /* needs you: a slap, a penalty, a card you owe */
+  --gl-leaf: #52d98c; /* working: a card arriving, a slap that landed */
+
+  /* ---- print. A playing card is an object, not a surface, so its white and
+          its red are the white and red of a printed card and follow no theme.
+          The back is the ground under artwork that has not loaded yet. */
+  --card-paper: #ffffff;
+  --card-red: #c4503c;
+  --card-back-ground: #e6e8e1;
+
+  /* ---- the colour of a called Cambio. Deeper than the red of a heart and
+          far deeper than ember, because it is not a status that will pass:
+          once it is called it is called, and the round is ending. It sits
+          outside the colourways for the same reason the statuses do. */
+  --gl-cambio: #7d1f2d;
+
+  /* ---- the radius ladder. Never below 24 on a surface; anything you touch
+          is a capsule or a circle. A card keeps a cut corner of its own,
+          because it is a picture of a thing rather than a panel (see below). */
+  --r-tray: 60px;
+  --r-sheet: 48px;
+  --r-tile: 36px;
+  --r-card: 24px;
+  --r-chip: 16px;
+  --r-pill: 999px;
+
+  /* ---- type. Two weights, 500 and 300, and 400 for running text.
+          The name is historical: the face is monospace, and the fallbacks
+          are the ones every platform already has. */
+  --sans: "Commit Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+
+  /* ---- motion. Untouched by the kit: the kit sets looks only. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-io: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-back: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-flip: cubic-bezier(0.45, 0.04, 0.25, 1);
+  --flip-ms: 520ms;
+
+  color-scheme: light;
+}
+
+/* ====================================================== 3 · THE DERIVATION
+ *
+ * Six colours, opened out. Nothing below this line is a decision - every value
+ * is the shipped kit's own ratio, measured off it, applied to the colourway in
+ * force. Lifting mixes towards white, sinking towards black, and an alpha is a
+ * mix with transparent.
+ */
+
+:root {
+  /* the three steps of the ground ramp */
+  --ground-top: color-mix(in srgb, #fff 14%, var(--tint-ground));
+  --ground-mid: var(--tint-ground);
+  --ground-bot: color-mix(in srgb, #000 6%, var(--tint-ground));
+
+  /* ---- the five printed colours, plus the two statuses above */
+  --gl-ink: var(--tint-ink);
+  --gl-mist: var(--tint-mist);
+  --gl-accent: var(--tint-accent);
+
+  /* ---- ink at the alphas the kit reads text in */
+  --gl-text: var(--tint-ink);
+  --gl-text-soft: color-mix(in srgb, var(--tint-ink) 80%, transparent);
+  --gl-text-quiet: color-mix(in srgb, var(--tint-ink) 72%, transparent);
+  --gl-text-faint: color-mix(in srgb, var(--tint-ink) 52%, transparent);
+  --gl-hair: color-mix(in srgb, var(--tint-ink) 9%, transparent);
+  --gl-hair-strong: color-mix(in srgb, var(--tint-ink) 16%, transparent);
+
+  /* ---- white at the alphas the kit fills with. A control is a well, a tray
+          is a veil, a rim on glass is a line. No control has an outline. */
+  --gl-veil: rgba(255, 255, 255, 0.14);
+  --gl-well: rgba(255, 255, 255, 0.58);
+  --gl-well-light: rgba(255, 255, 255, 0.78);
+  --gl-line: rgba(255, 255, 255, 0.22);
+  --gl-glass: rgba(255, 255, 255, 0.58);
+
+  /* ---- the grounds. Air is the three-stop ramp with a warm bloom in the
+          bottom-right corner and a cooler one on the left; Sheet is the same
+          ramp lifted towards white with a bloom of light along the bottom
+          edge. Which one the page stands on is data-ground in index.html. */
+  --gl-air:
+    radial-gradient(
+      55% 60% at 100% 100%,
+      color-mix(in srgb, var(--tint-bloom-warm) 95%, transparent) 0%,
+      color-mix(in srgb, var(--tint-bloom-warm) 0%, transparent) 100%
+    ),
+    radial-gradient(
+      45% 45% at 0% 62%,
+      color-mix(in srgb, var(--tint-bloom-cool) 90%, transparent) 0%,
+      color-mix(in srgb, var(--tint-bloom-cool) 0%, transparent) 70%
+    ),
+    linear-gradient(180deg, var(--ground-top) 0%, var(--ground-mid) 48%, var(--ground-bot) 100%);
+  --gl-air-cool: linear-gradient(200deg, var(--ground-top) 0%, var(--ground-mid) 50%, var(--ground-bot) 100%);
+  --gl-sheet-solid:
+    radial-gradient(70% 84px at 50% 100%, #fff 0%, rgba(255, 255, 255, 0.6) 42%, rgba(255, 255, 255, 0) 100%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, color-mix(in srgb, #fff 16%, var(--tint-ground)) 90%, transparent) 0%,
+      color-mix(in srgb, color-mix(in srgb, #fff 36%, var(--tint-ground)) 93%, transparent) 45%,
+      color-mix(in srgb, color-mix(in srgb, #fff 72%, var(--tint-ground)) 97%, transparent) 100%
+    );
+  /* the flat colour the page is painted before any of that lands */
+  --gl-ground-flat: color-mix(in srgb, #fff 24%, var(--tint-ground));
+
+  /* ---- the sheet material: darker at the top, milky in the middle, a white
+          bloom on the bottom edge. Every raised surface is made of this. */
+  --gl-sheet:
+    radial-gradient(
+      70% 84px at 50% 100%,
+      rgba(255, 255, 255, 0.96) 0%,
+      rgba(255, 255, 255, 0.5) 42%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.34) 30%,
+      rgba(255, 255, 255, 0.52) 62%,
+      rgba(255, 255, 255, 0.66) 100%
+    );
+  --gl-sheet-edge:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42), inset 0 0 14px 2px rgba(255, 255, 255, 0.2),
+    0 10px 24px -6px color-mix(in srgb, var(--tint-ink) 14%, transparent);
+
+  /* ---- lit: white running to ice-accent. One thing on the screen is lit at a
+          time, and it is the brightest thing on it. Here it is whose turn it
+          is - the kit's lit row, in the one place the game has for it. */
+  --gl-lit: linear-gradient(
+    115deg,
+    #fff 0%,
+    #fefefe 34%,
+    color-mix(in srgb, #fff 80%, var(--tint-accent)) 58%,
+    color-mix(in srgb, #fff 62%, var(--tint-accent)) 80%,
+    color-mix(in srgb, #fff 24%, var(--tint-mist)) 100%
+  );
+  --gl-lit-edge: 0 10px 24px -8px color-mix(in srgb, var(--tint-ink) 26%, transparent);
+
+  /* ---- what recedes behind a sheet */
+  --gl-recede: color-mix(in srgb, color-mix(in srgb, #fff 32%, var(--tint-ground)) 62%, transparent);
+
+  /* ---- lift. Three shadows, all of them ink at a low alpha. */
+  --gl-lift: 0 2px 10px color-mix(in srgb, var(--tint-ink) 6%, transparent);
+  --gl-lift-2: 0 2px 6px color-mix(in srgb, var(--tint-ink) 6%, transparent),
+    0 10px 24px -12px color-mix(in srgb, var(--tint-ink) 22%, transparent);
+  --gl-lift-3: 0 2px 6px color-mix(in srgb, var(--tint-ink) 6%, transparent),
+    0 24px 48px -20px color-mix(in srgb, var(--tint-ink) 35%, transparent);
+
+  /* ---- the focus ring. The accent is a fill in two places only: this and
+          the caret. */
+  --gl-ring: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 4.5px var(--tint-accent);
+}
+
+/* The page ground. Sheet unless index.html says otherwise. */
+html,
+html[data-ground="sheet"] {
+  --gl-page: var(--gl-sheet-solid);
+}
+html[data-ground="air"] {
+  --gl-page: var(--gl-air);
+}
+html[data-ground="cool"] {
+  --gl-page: var(--gl-air-cool);
+}
+
+/* ======================================== 4 · CAMBIO'S OWN NAMES
+ *
+ * The table was built in paper and ink, and its stylesheet still speaks that
+ * way. These point its words at the kit's tokens, so the rest of the CSS reads
+ * as what a thing is rather than what colour it happens to be.
+ */
+
+:root {
+  /* ---- ground */
+  --bg: var(--gl-ground-flat);
+
+  /* ---- ink */
+  --ink: var(--gl-text);
+  --text: var(--gl-text);
+  --muted: var(--gl-text-soft);
+  --faint: var(--gl-text-quiet);
+  --line: var(--gl-hair);
+  --line-strong: var(--gl-hair-strong);
+
+  /* ---- the three things colour is allowed to mean, and nothing else.
+          Chosen is never a colour: chosen is ink. */
+  --active: var(--gl-accent); /* live, focused, yours to click */
+  --needs: var(--gl-ember); /* a slap, a penalty, a card owed */
+  --working: var(--gl-leaf); /* a card arriving, a slap that landed */
+  --called: var(--gl-cambio); /* Cambio is called and the round is ending */
+
+  /* ---- lift */
+  --e1: var(--gl-lift);
+  --e2: var(--gl-lift-2);
+  --e3: var(--gl-lift-3);
+  --card-shadow: 0 1px 1px color-mix(in srgb, var(--tint-ink) 7%, transparent),
+    0 3px 7px -3px color-mix(in srgb, var(--tint-ink) 16%, transparent);
+  --card-shadow-lift: 0 2px 3px color-mix(in srgb, var(--tint-ink) 6%, transparent),
+    0 14px 22px -10px color-mix(in srgb, var(--tint-ink) 28%, transparent);
+}

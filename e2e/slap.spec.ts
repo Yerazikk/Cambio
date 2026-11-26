@@ -75,7 +75,7 @@ test.describe("slapping", () => {
     for (const player of players) await player.close();
   });
 
-  test("arms with the button and marks every card as a target", async ({ browser }) => {
+  test("marks every card as a target once the button is pressed", async ({ browser }) => {
     const { players } = await seatTable(browser, ["Ana", "Bo"]);
     const [ana] = players;
     await startRound(players);
@@ -90,7 +90,28 @@ test.describe("slapping", () => {
     for (const player of players) await player.close();
   });
 
-  test("arms with the S key and cancels with Escape", async ({ browser }) => {
+  test("stops the table for everyone until the slapper picks", async ({ browser }) => {
+    const { players } = await seatTable(browser, ["Ana", "Bo"]);
+    const [ana, bo] = players;
+    await startRound(players);
+
+    await ana!.page.getByTestId("slap-button").click();
+
+    // Every screen knows the game has stopped, not just the slapper's.
+    await expect(ana!.page.getByTestId("table")).toHaveAttribute("data-stopped", "");
+    await expect(bo!.page.getByTestId("table")).toHaveAttribute("data-stopped", "");
+    await expect(bo!.page.getByTestId("prompt")).toContainText(/ana is slapping/i);
+    // Nobody takes a turn while it is stopped, whoever's turn it was.
+    await expect(ana!.page.getByTestId("cambio-button")).toHaveCount(0);
+    await expect(bo!.page.getByTestId("cambio-button")).toHaveCount(0);
+
+    await ana!.slot(0).click();
+    await expect(ana!.page.getByTestId("table")).not.toHaveAttribute("data-stopped", "");
+
+    for (const player of players) await player.close();
+  });
+
+  test("is a commitment: Escape does not take it back", async ({ browser }) => {
     const { players } = await seatTable(browser, ["Ana", "Bo"]);
     const [ana] = players;
     await startRound(players);
@@ -99,7 +120,8 @@ test.describe("slapping", () => {
     await expect(ana!.slot(0)).toHaveClass(/card--slap/);
 
     await ana!.page.keyboard.press("Escape");
-    await expect(ana!.slot(0)).not.toHaveClass(/card--slap/);
+    // Still owed. Pressing SLAP is the slap, and the only way out is a card.
+    await expect(ana!.slot(0)).toHaveClass(/card--slap/);
 
     for (const player of players) await player.close();
   });

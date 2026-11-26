@@ -22,7 +22,8 @@ export type TableProps = {
   log: LogLine[];
   act: (action: Action) => void;
   slap: (targetId: PlayerId, slot: number) => void;
-  armSlap: (armed: boolean) => void;
+  /** Press SLAP: claims a place in the queue and stops the table. */
+  claimSlap: () => void;
   setPick: (pick: PickOne) => void;
   revealFor: (ownerId: PlayerId, slot: number) => Card | null;
   flashFor: (ownerId: PlayerId, slot: number) => Flash | null;
@@ -33,13 +34,24 @@ export type TableProps = {
 type SlotState = "idle" | "targetable" | "selected" | "slap";
 
 export function Table(props: TableProps): React.JSX.Element {
-  const { view, me, slapArmed, slapPending, keysHeld, dealing, pick, log, act, slap, armSlap, setPick } = props;
+  const { view, me, slapArmed, slapPending, keysHeld, dealing, pick, log, act, slap, claimSlap, setPick } = props;
   const { revealFor, flashFor, pileFlash, onLeave } = props;
 
   const myTurn = view.turnPlayerId === me;
   const mySeat = view.players.find((p) => p.id === me);
   const ownSlots = mySeat?.slots.length ?? 0;
   const iOweACard = view.slapDebt?.slapperId === me;
+
+  /*
+   * A slap stops the table. Whoever holds the lock owes it a card and nothing
+   * else can happen until they turn one over; everyone behind them is already
+   * committed and waits their go.
+   */
+  const lock = view.slapLock;
+  const iHoldTheLock = lock !== null && lock.holderId === me;
+  const iAmQueued = lock !== null && lock.waiting.includes(me);
+  /** Clicking a card means slapping it: either I hold the lock, or I just pressed SLAP. */
+  const slapping = iHoldTheLock || (slapArmed && lock === null);
   /** A card drawn from the deck can be thrown away - from the button or the pile. */
   const canDiscardDrawn = myTurn && view.phase === "holdingCard" && !view.heldFromDiscard;
 
@@ -55,27 +67,30 @@ export function Table(props: TableProps): React.JSX.Element {
     const onKey = (event: KeyboardEvent): void => {
       if (event.target instanceof HTMLInputElement || keysHeld) return;
 
+      // Escape drops a half-made choice. It no longer unslaps: once the table
+      // has stopped on you there is nothing to back out of.
       if (event.key === "Escape") {
-        armSlap(false);
         setPick(null);
         return;
       }
       if (event.key === "s" || event.key === "S") {
-        if (view.slapOpen) armSlap(!slapArmed);
+        if (view.slapOpen && !slapping && !iAmQueued) claimSlap();
         return;
       }
       const digit = Number.parseInt(event.key, 10);
-      if (!Number.isNaN(digit) && digit >= 1 && digit <= ownSlots && view.slapOpen) {
+      if (!Number.isNaN(digit) && digit >= 1 && digit <= ownSlots && view.slapOpen && !iAmQueued) {
         slap(me, digit - 1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view.slapOpen, slapArmed, keysHeld, ownSlots, me, armSlap, setPick, slap]);
+  }, [view.slapOpen, slapping, iAmQueued, keysHeld, ownSlots, me, claimSlap, setPick, slap]);
 
   /** What clicking a given slot would mean right now. */
   const slotState = (ownerId: PlayerId, slot: number): SlotState => {
-    if (slapArmed && view.slapOpen) return "slap";
+    if (slapping && view.slapOpen) return "slap";
+    // Nothing on a stopped table is clickable except the slap it is stopped on.
+    if (lock !== null) return "idle";
     const mine = ownerId === me;
 
     if (pick !== null && pick.ownerId === ownerId && pick.slot === slot) return "selected";
@@ -120,10 +135,11 @@ export function Table(props: TableProps): React.JSX.Element {
   };
 
   const onSlot = (ownerId: PlayerId, slot: number): void => {
-    if (slapArmed && view.slapOpen) {
+    if (slapping && view.slapOpen) {
       slap(ownerId, slot);
       return;
     }
+    if (lock !== null) return;
     const mine = ownerId === me;
 
     if (view.phase === "study" && mine) {
@@ -163,11 +179,24 @@ export function Table(props: TableProps): React.JSX.Element {
   const ring = seatRing(view.players, me);
 
   return (
-    <main className="table" data-players={view.players.length} data-dealing={dealing ? "" : undefined}>
+    <main
+      className="table"
+      data-testid="table"
+      data-players={view.players.length}
+      data-dealing={dealing ? "" : undefined}
+      /*
+       * Whose turn it is, as a fact about the table rather than a sentence on
+       * it. The prompt used to carry this and no longer does - "your turn" is
+       * said by the piles lighting up, which is quicker to read and does not
+       * cost the table a line of furniture.
+       */
+      data-my-turn={myTurn ? "" : undefined}
+      data-stopped={view.slapLock !== null ? "" : undefined}
+    >
       <header className="table__bar">
         <span className="table__code">{view.code}</span>
         <span className="table__status" data-testid="prompt">
-          {prompt(view, me, pick, iOweACard)}
+          {prompt(view, me, pick, iOweACard, iHoldTheLock, iAmQueued)}
         </span>
         <span className="table__right">
           <TurnClock endsAt={view.turnEndsAt} />
@@ -185,10 +214,10 @@ export function Table(props: TableProps): React.JSX.Element {
             deckCount={view.deckCount}
             discardTop={view.discardTop}
             discardCount={view.discardCount}
-            canDrawDeck={myTurn && view.phase === "awaitingAction"}
-            canDrawDiscard={myTurn && view.phase === "awaitingAction" && view.discardTop !== null}
-            canDiscardDrawn={canDiscardDrawn}
-            slapArmed={slapArmed}
+            canDrawDeck={myTurn && view.phase === "awaitingAction" && lock === null}
+            canDrawDiscard={myTurn && view.phase === "awaitingAction" && view.discardTop !== null && lock === null}
+            canDiscardDrawn={canDiscardDrawn && lock === null}
+            slapArmed={slapping}
             deckMoved={pileFlash("deck")}
             discardMoved={pileFlash("discard")}
             onDrawDeck={() => act({ a: "drawDeck" })}
@@ -232,10 +261,10 @@ export function Table(props: TableProps): React.JSX.Element {
       <footer className="table__controls">
         <SlapBar
           open={view.slapOpen}
-          armed={slapArmed}
+          picking={slapping}
+          queued={iAmQueued}
           pending={slapPending}
-          ownSlots={ownSlots}
-          onArm={armSlap}
+          onClaim={claimSlap}
         />
 
         <div className="table__buttons">
@@ -250,7 +279,7 @@ export function Table(props: TableProps): React.JSX.Element {
             </button>
           )}
 
-          {myTurn && view.phase === "awaitingAction" && view.finalTurnsRemaining === null && (
+          {myTurn && view.phase === "awaitingAction" && view.finalTurnsRemaining === null && lock === null && (
             <button
               type="button"
               className="button button--danger"
@@ -277,7 +306,7 @@ export function Table(props: TableProps): React.JSX.Element {
             </button>
           )}
 
-          {myTurn && view.pendingPower !== null && (
+          {myTurn && view.pendingPower !== null && view.optionalPowers && (
             <button
               type="button"
               className="button button--ghost"
@@ -291,7 +320,7 @@ export function Table(props: TableProps): React.JSX.Element {
             </button>
           )}
 
-          {myTurn && view.phase === "powerKing" && view.kingPeeked && (
+          {myTurn && view.phase === "powerKing" && view.kingPeeked && view.optionalPowers && (
             <button type="button" className="button" onClick={() => act({ a: "kingSkip" })} data-testid="king-pass">
               Keep both cards
             </button>
@@ -302,10 +331,29 @@ export function Table(props: TableProps): React.JSX.Element {
   );
 }
 
-/** One line telling the player exactly what the table is waiting for. */
-function prompt(view: GameView, me: PlayerId, pick: PickOne, iOweACard: boolean): string {
+/**
+ * One line telling the player what the table is waiting for - and nothing when
+ * it is waiting for the obvious. Your own turn starting needs no caption: the
+ * piles light up, which says it better than a sentence does.
+ */
+function prompt(
+  view: GameView,
+  me: PlayerId,
+  pick: PickOne,
+  iOweACard: boolean,
+  iHoldTheLock: boolean,
+  iAmQueued: boolean,
+): string {
   const mySeat = view.players.find((p) => p.id === me);
   const turnName = view.players.find((p) => p.id === view.turnPlayerId)?.name ?? "someone";
+
+  // A slap outranks everything: the table has stopped, and that is the only
+  // thing anyone needs to be told until it starts again.
+  if (view.slapLock !== null) {
+    if (iHoldTheLock) return "Flip a card to slap";
+    const holder = view.players.find((p) => p.id === view.slapLock?.holderId)?.name ?? "someone";
+    return iAmQueued ? `${holder} slaps first - you are next` : `${holder} is slapping`;
+  }
 
   if (view.phase === "finished") {
     const winner = view.players.find((p) => p.id === view.winnerId)?.name ?? "nobody";
@@ -326,7 +374,7 @@ function prompt(view: GameView, me: PlayerId, pick: PickOne, iOweACard: boolean)
 
   switch (view.phase) {
     case "awaitingAction":
-      return "Your turn - draw from the deck or the pile";
+      return "";
     case "holdingCard":
       return view.heldFromDiscard
         ? "Taken from the pile - it must go into your hand"
@@ -341,9 +389,8 @@ function prompt(view: GameView, me: PlayerId, pick: PickOne, iOweACard: boolean)
         : "Now pick the card to swap it with - either hand will do";
     case "powerKing":
       if (!view.kingPeeked) return "King - look at any card on the table";
-      return pick === null
-        ? "Now pick any card to swap, or keep both as they are"
-        : "Now pick the card to swap it with - either hand will do";
+      if (pick !== null) return "Now pick the card to swap it with - either hand will do";
+      return view.optionalPowers ? "Now pick any card to swap, or keep both as they are" : "Now pick any card to swap";
     default:
       return "Your turn";
   }

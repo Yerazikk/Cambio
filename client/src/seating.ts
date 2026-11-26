@@ -97,3 +97,23 @@ function sideFor(cos: number, sin: number): Placement["side"] {
   if (Math.abs(sin) >= Math.abs(cos)) return sin > 0 ? "bottom" : "top";
   return cos > 0 ? "right" : "left";
 }
+
+/**
+ * Where one card sits in its owner's hand.
+ *
+ * A hand is two rows deep and grows sideways, in columns of two. The first
+ * column is the anchor and never moves: the second goes to its right, the next
+ * two after that keep going right, and once the hand is eight cards wide the
+ * rest grow back out to the left. A penalty card therefore lands beside the
+ * hand rather than rearranging it - the position a player memorised at the
+ * start of the round is the position it is still in at the end, which is the
+ * whole point of a memory game.
+ *
+ *   slot  1  2  3  4  5  6  7  8  9 10 11 12
+ *   col   0  0  1  1  2  2  3  3 -1 -1 -2 -2
+ *   row   0  1  0  1  0  1  0  1  0  1  0  1
+ */
+export function handPlace(slot: number): { col: number; row: number } {
+  const pair = Math.floor(slot / 2);
+  return { col: pair <= 3 ? pair : 3 - pair, row: slot % 2 };
+}

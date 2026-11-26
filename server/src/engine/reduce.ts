@@ -15,7 +15,7 @@ import {
 import { shuffle } from "../deck.js";
 import type { Rng } from "../rng.js";
 import { settle } from "./score.js";
-import { discardTopCard, forgetCard, learn, seatOf, turnSeat, type GameState } from "./state.js";
+import { discardTopCard, forgetCard, isLocked, learn, seatOf, turnSeat, type GameState } from "./state.js";
 
 export type ReduceCtx = { now: number; rng: Rng };
 
@@ -60,9 +60,29 @@ function applyAction(
   // slapper in the payload, so this is settled before any actor check. A
   // slapper who has since left the table is voided inside resolveSlap.
   if (action.a === "slapResolve") return resolveSlap(state, out, ctx, action);
+  if (action.a === "slapForfeit") return forfeitSlap(state, out, ctx, action);
+  /*
+   * Only the turn clock sends this, and it is the one thing that may walk away
+   * from a power the rules say is compulsory. A seat nobody is sitting in
+   * would otherwise hold the table for the rest of the round.
+   */
+  if (action.a === "powerTimeout") {
+    if (state.pendingPower === null) return fail("illegalAction", "there is no power to time out");
+    endTurn(state, out, ctx);
+    return { ok: true, state, out };
+  }
 
   const actor = seatOf(state, actorId);
   if (!actor) return fail("sessionInvalid", "you are not seated at this table");
+
+  /*
+   * A slap stops the table. Nothing but another slap is legal until the queue
+   * has emptied, which is what makes "the game pauses while you pick" a rule
+   * rather than a hint - the slapper is not racing the turn they interrupted.
+   */
+  if (isLocked(state) && !SLAP_ACTIONS.has(action.a)) {
+    return fail("illegalAction", "the table is stopped while a slap is settled");
+  }
 
   switch (action.a) {
     /* ------------------------------------------------- pre-round study */
@@ -253,8 +273,15 @@ function applyAction(
     }
 
     case "forfeitPower": {
-      // Powers are optional in Cambio, so declining one is a legal move rather
-      // than a forced default. It is also what the turn clock plays on timeout.
+      /*
+       * A power you triggered is a power you use. Discarding a seven from the
+       * deck is a decision with a consequence, and being able to shrug it off
+       * would take the consequence away - so declining is only a move at a
+       * table whose host has chosen to allow it.
+       */
+      if (!state.rules.optionalPowers) {
+        return fail("illegalAction", "this table plays powers out - you have to use it");
+      }
       if (state.pendingPower === null) return fail("illegalAction", "you have no power to decline");
       if (turnSeat(state)?.id !== actorId) return fail("notYourTurn", "it is not your turn");
       endTurn(state, out, ctx);
@@ -265,15 +292,21 @@ function applyAction(
       const guard = requireTurn(state, actorId, "powerKing");
       if (guard) return guard;
       if (!state.kingPeeked) return fail("illegalAction", "look at a card before passing");
+      // Keeping both cards is the king's own way of declining the second half
+      // of its power, so it goes the same way as any other decline.
+      if (!state.rules.optionalPowers) {
+        return fail("illegalAction", "this table plays powers out - you have to swap");
+      }
       endTurn(state, out, ctx);
       return { ok: true, state, out };
     }
 
     /* --------------------------------------------------------- slapping */
 
-    case "slap": {
-      // Slaps never reach the reducer directly: the arbiter orders them first
-      // and feeds back a `slapResolve` for each one the queue reaches.
+    case "slap":
+    case "slapClaim": {
+      // Slaps never reach the reducer directly: the arbiter orders them into a
+      // queue and feeds back a `slapResolve` for each one the queue reaches.
       return fail("illegalAction", "slaps are resolved by the arbiter");
     }
 
@@ -310,6 +343,9 @@ function applyAction(
 }
 
 /* --------------------------------------------------------------- helpers */
+
+/** The only moves a stopped table still accepts. */
+const SLAP_ACTIONS: ReadonlySet<string> = new Set(["slap", "slapClaim", "slapGive"]);
 
 function requireTurn(state: GameState, actorId: PlayerId, phase: Phase): ReduceResult | null {
   if (state.phase !== phase) {
@@ -448,6 +484,58 @@ function resolveSlap(
   return { ok: true, state, out };
 }
 
+/**
+ * The holder of the lock ran out of time without naming a card.
+ *
+ * It costs exactly what a wrong slap costs. Stopping the table is the slap's
+ * privilege; keeping it stopped for nothing is not.
+ */
+function forfeitSlap(
+  state: GameState,
+  out: Outbound[],
+  ctx: ReduceCtx,
+  action: Extract<EngineAction, { a: "slapForfeit" }>,
+): ReduceResult {
+  const { slapperId } = action;
+  const slapper = seatOf(state, slapperId);
+  if (!slapper) {
+    out.push({
+      to: "all",
+      event: {
+        t: "slap.resolved",
+        slapperId,
+        targetId: slapperId,
+        slot: 0,
+        outcome: "noLongerValid",
+        endedById: null,
+        marginMs: null,
+      },
+    });
+    return { ok: true, state, out };
+  }
+
+  if (refillDeckIfEmpty(state, ctx)) {
+    const penalty = state.deck.pop();
+    if (penalty !== undefined) {
+      slapper.hand.push(penalty);
+      announce(out, "penalty", slapperId, [{ ownerId: slapperId, slot: slapper.hand.length - 1 }]);
+    }
+  }
+  out.push({
+    to: "all",
+    event: {
+      t: "slap.resolved",
+      slapperId,
+      targetId: slapperId,
+      slot: 0,
+      outcome: "noPickPenalty",
+      endedById: null,
+      marginMs: null,
+    },
+  });
+  return { ok: true, state, out };
+}
+
 /** Whether a settled slap was right, and so ends the queue behind it. */
 export function slapLanded(outcome: SlapOutcome): boolean {
   return outcome === "ownCardDiscarded" || outcome === "otherCardDiscarded";
@@ -527,6 +615,7 @@ function finishRound(state: GameState, out: Outbound[]): void {
   state.pendingPower = null;
   state.kingPeeked = false;
   state.slapGiveFor = null;
+  state.slapLock = null;
   state.turnEndsAt = null;
 
   const result = settle(state);

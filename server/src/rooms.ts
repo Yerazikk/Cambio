@@ -11,6 +11,7 @@ import {
   ROOM_CODE_LENGTH,
   ROOM_REAP_IDLE_MS,
   type Action,
+  type EngineAction,
   type ErrorCode,
   type PlayerId,
   type RoomCode,
@@ -18,7 +19,15 @@ import {
 } from "@cambio/shared";
 import { reduce, slapLanded, type Outbound, type ReduceCtx } from "./engine/reduce.js";
 import { addSeat, emptyState, startRound } from "./engine/setup.js";
-import { seatOf, slapOpen, viewFor, type GameState } from "./engine/state.js";
+import {
+  isLocked,
+  lockHolder,
+  seatOf,
+  slapOpen,
+  viewFor,
+  type GameState,
+  type SlapQueueEntry,
+} from "./engine/state.js";
 import type { Rng } from "./rng.js";
 import { RttTracker } from "./rtt.js";
 import { SlapArbiter, realScheduler, type Scheduler, type SlapRace } from "./slap.js";
@@ -33,6 +42,8 @@ export type Room = {
   /** Seats whose player has dropped but whose grace period is still running. */
   graceHandles: Map<PlayerId, unknown>;
   turnHandle: unknown;
+  /** Runs while a slapper holds the table and has not yet named a card. */
+  lockHandle: unknown;
   lastActivityAt: number;
 };
 
@@ -159,6 +170,7 @@ export class RoomManager {
       }),
       graceHandles: new Map(),
       turnHandle: null,
+      lockHandle: null,
       lastActivityAt: this.opts.now(),
     };
     this.rooms.set(code, room);
@@ -332,6 +344,24 @@ export class RoomManager {
   }
 
   /**
+   * Choose whether a power may be declined. Lobby only, like the deck count:
+   * it changes how a turn plays, and a rule cannot change under a round that
+   * is already being played.
+   */
+  setPowers(code: RoomCode, byPlayerId: PlayerId, optional: boolean): Result<{ optionalPowers: boolean }> {
+    const room = this.rooms.get(code);
+    if (!room) return err("roomNotFound", "that room no longer exists");
+    if (room.state.hostId !== byPlayerId) return err("notHost", "only the host can change the rules");
+    if (room.state.phase !== "lobby") return err("illegalAction", "the rules are set before the round starts");
+    if (typeof optional !== "boolean") return err("malformed", "powers are either optional or not");
+
+    room.state.rules = { ...room.state.rules, optionalPowers: optional };
+    room.state.version += 1;
+    room.lastActivityAt = this.opts.now();
+    return { ok: true, optionalPowers: optional };
+  }
+
+  /**
    * Choose the table's card back. Allowed at any point, unlike the deck count:
    * it changes nothing but how the cards look, so there is no round it could
    * unsettle.
@@ -376,6 +406,8 @@ export class RoomManager {
     }
 
     room.arbiter.cancel();
+    this.clearLockClock(room);
+    this.margins.delete(room.code);
     room.state = startRound(room.state, this.opts.rng);
     room.lastActivityAt = this.opts.now();
     return { ok: true, out: [] };
@@ -387,7 +419,15 @@ export class RoomManager {
     const room = this.rooms.get(code);
     if (!room) return err("roomNotFound", "that room no longer exists");
 
-    if (action.a === "slap") return this.submitSlap(room, playerId, action.targetId, action.slot);
+    if (action.a === "slapClaim") return this.claimSlap(room, playerId, null, null);
+    if (action.a === "slap") {
+      // While you hold the lock the table is already stopped on you, so naming
+      // a card answers it rather than starting a second slap.
+      if (lockHolder(room.state)?.playerId === playerId) {
+        return this.answerSlap(room, playerId, action.targetId, action.slot);
+      }
+      return this.claimSlap(room, playerId, action.targetId, action.slot);
+    }
 
     const result = reduce(room.state, playerId, action, this.ctx());
     if (!result.ok) return err(result.code, result.message);
@@ -399,86 +439,266 @@ export class RoomManager {
   }
 
   /**
-   * Enter a slap into the race. Nothing is applied yet: the arbiter holds the
-   * window open so a player on a worse connection still gets a fair shot at
-   * being first in the queue.
+   * Enter a slap into the queue.
+   *
+   * Nothing is applied yet. If the table is still running, the arbiter holds a
+   * short window open so a player on a worse connection still gets a fair shot
+   * at being first; if it is already stopped on somebody else's slap, this one
+   * joins the back of their queue instead.
    */
-  private submitSlap(room: Room, playerId: PlayerId, targetId: PlayerId, slot: number): Result<{ out: Outbound[] }> {
+  private claimSlap(
+    room: Room,
+    playerId: PlayerId,
+    targetId: PlayerId | null,
+    slot: number | null,
+  ): Result<{ out: Outbound[] }> {
     if (!seatOf(room.state, playerId)) return err("sessionInvalid", "you are not seated at this table");
     if (!slapOpen(room.state)) return err("illegalAction", "you cannot slap right now");
 
-    room.arbiter.submit({
-      playerId,
-      targetId,
-      slot,
-      oneWayMs: room.rtt.oneWayFor(playerId),
-    });
     room.lastActivityAt = this.opts.now();
+
+    const lock = room.state.slapLock;
+    if (lock !== null) {
+      const held = lock.queue.find((entry) => entry.playerId === playerId);
+      if (held !== undefined) {
+        // One place in the queue per player. A second press is the same finger,
+        // not a second bet - but it may be the card arriving for a bare claim.
+        if (held.targetId === null && targetId !== null) {
+          held.targetId = targetId;
+          held.slot = slot;
+          room.state.version += 1;
+        }
+        return { ok: true, out: [] };
+      }
+      lock.queue.push({ playerId, targetId, slot });
+      room.state.version += 1;
+      return { ok: true, out: [] };
+    }
+
+    room.arbiter.submit({ playerId, targetId, slot, oneWayMs: room.rtt.oneWayFor(playerId) });
     return { ok: true, out: [] };
   }
 
+  /** The holder of the lock names the card their slap meant. */
+  private answerSlap(room: Room, playerId: PlayerId, targetId: PlayerId, slot: number): Result<{ out: Outbound[] }> {
+    const holder = lockHolder(room.state);
+    if (holder === null || holder.playerId !== playerId) {
+      return err("illegalAction", "the table is not waiting on your slap");
+    }
+
+    holder.targetId = targetId;
+    holder.slot = slot;
+    room.state.version += 1;
+    room.lastActivityAt = this.opts.now();
+
+    const out: Outbound[] = [];
+    this.pumpLock(room, out);
+    return { ok: true, out };
+  }
+
   /**
-   * Called when a slap window closes. Plays the queue out in order.
+   * Called when a slap window closes. The race becomes the queue, and the
+   * table stops until that queue has emptied.
    *
    * Slapping at the same moment as someone else does not cancel your slap, it
-   * puts you behind them: each slap in turn is applied in full, and the queue
+   * puts you behind them: each slap in turn is played in full, and the queue
    * stops at the first one that is right. If the player ahead of you was
-   * wrong, yours is still played - penalty and all.
+   * wrong, yours is still played - and you still owe the table a card.
    */
   private onSlapRace(code: RoomCode, race: SlapRace): void {
     const room = this.rooms.get(code);
     if (!room) return;
 
+    const queue: SlapQueueEntry[] = [...race.order, ...race.late].map((claim) => ({
+      playerId: claim.playerId,
+      targetId: claim.targetId,
+      slot: claim.slot,
+    }));
+    if (queue.length === 0) return;
+
+    this.engageLock(room, queue, race);
+
     const out: Outbound[] = [];
-    let endedById: PlayerId | null = null;
+    this.pumpLock(room, out);
+    this.emitAsync(code, out);
+  }
+
+  /**
+   * Stop the table on a slap.
+   *
+   * What is left of the interrupted turn's clock is put aside rather than left
+   * to run down: a player must not lose their turn because somebody else
+   * slapped during it.
+   */
+  private engageLock(room: Room, queue: SlapQueueEntry[], race: SlapRace | null): void {
+    const now = this.opts.now();
+    const remaining = room.state.turnEndsAt === null ? null : Math.max(0, room.state.turnEndsAt - now);
+
+    room.state.slapLock = { queue, endsAt: null, turnRemainingMs: remaining };
+    room.state.turnEndsAt = null;
+    room.state.version += 1;
+    this.armTurnClock(room);
+    this.margins.set(room.code, race);
+  }
+
+  /** How far apart the slaps in each room's open queue landed, for the report. */
+  private readonly margins = new Map<RoomCode, SlapRace | null>();
+
+  private marginFor(code: RoomCode, playerId: PlayerId, first: boolean): number | null {
+    const race = this.margins.get(code) ?? null;
+    if (race === null) return null;
+    if (first) return race.marginMs;
+    return [...race.order, ...race.late].find((c) => c.playerId === playerId)?.behindMs ?? null;
+  }
+
+  /**
+   * Play the queue as far as it will go.
+   *
+   * It runs while the head of the queue has named a card and stops the moment
+   * one has not - that stop is the pause the slapper is given to pick. A slap
+   * that lands ends the queue outright: everyone behind it keeps their cards,
+   * which is why being second only costs you anything when the player ahead of
+   * you was wrong.
+   */
+  private pumpLock(room: Room, out: Outbound[]): void {
     let played = 0;
 
-    for (const claim of race.order) {
+    for (;;) {
+      const lock = room.state.slapLock;
+      if (lock === null) return;
+
+      const head = lock.queue[0];
+      if (head === undefined) {
+        this.releaseLock(room, out, null);
+        return;
+      }
+
+      // A seat that has since been given up cannot answer for its slap.
+      if (!seatOf(room.state, head.playerId)) {
+        lock.queue.shift();
+        room.state.version += 1;
+        continue;
+      }
+
+      if (head.targetId === null || head.slot === null) {
+        // The table is now waiting on this player, with a clock on it.
+        this.armLockClock(room);
+        return;
+      }
+
       played += 1;
       const result = reduce(
         room.state,
-        claim.playerId,
+        head.playerId,
         {
           a: "slapResolve",
-          slapperId: claim.playerId,
-          targetId: claim.targetId,
-          slot: claim.slot,
+          slapperId: head.playerId,
+          targetId: head.targetId,
+          slot: head.slot,
           // The first slap is reported by how far clear it was; every one
           // after it by how far behind the first it landed.
-          marginMs: played === 1 ? race.marginMs : claim.behindMs,
+          marginMs: this.marginFor(room.code, head.playerId, played === 1),
         },
         this.ctx(),
       );
-      if (!result.ok) continue;
+      if (!result.ok) {
+        lock.queue.shift();
+        room.state.version += 1;
+        continue;
+      }
 
       room.state = result.state;
       out.push(...result.out);
-      this.armTurnClock(room);
 
       if (landed(result.out)) {
-        endedById = claim.playerId;
-        break;
+        this.releaseLock(room, out, head.playerId);
+        return;
       }
-    }
 
-    // Whoever is still in the queue behind a slap that landed never has to play
-    // theirs. They are told individually, so an optimistic local flash can be
-    // rolled back - the rest of the table has no business knowing they tried.
-    for (const spared of [...race.order.slice(played), ...race.late]) {
+      room.state.slapLock?.queue.shift();
+      room.state.version += 1;
+    }
+  }
+
+  /**
+   * Let the table go again.
+   *
+   * Everyone still queued is told, privately, that their slap was never played:
+   * the one ahead of them was right, so it cost them nothing. The rest of the
+   * table has no business knowing they tried.
+   */
+  private releaseLock(room: Room, out: Outbound[], endedById: PlayerId | null): void {
+    const lock = room.state.slapLock;
+    if (lock === null) return;
+
+    for (const spared of lock.queue.slice(1)) {
       out.push({
         to: spared.playerId,
         event: {
           t: "slap.resolved",
           slapperId: spared.playerId,
-          targetId: spared.targetId,
-          slot: spared.slot,
+          targetId: spared.targetId ?? spared.playerId,
+          slot: spared.slot ?? 0,
           outcome: "lostRace",
           endedById,
-          marginMs: spared.behindMs,
+          marginMs: this.marginFor(room.code, spared.playerId, false),
         },
       });
     }
 
+    this.clearLockClock(room);
+    room.state.slapLock = null;
+    this.margins.delete(room.code);
+
+    // Give the interrupted turn back the clock it was holding when the slap
+    // stopped the table.
+    const alive = room.state.phase !== "finished" && room.state.phase !== "lobby";
+    if (alive && lock.turnRemainingMs !== null && room.state.turnEndsAt === null) {
+      room.state.turnEndsAt = this.opts.now() + lock.turnRemainingMs;
+    }
+    room.state.version += 1;
+    this.armTurnClock(room);
+  }
+
+  private clearLockClock(room: Room): void {
+    if (room.lockHandle !== null) {
+      this.scheduler.clearTimeout(room.lockHandle);
+      room.lockHandle = null;
+    }
+  }
+
+  /** The holder's time to name a card. Running out of it costs them one. */
+  private armLockClock(room: Room): void {
+    this.clearLockClock(room);
+    const lock = room.state.slapLock;
+    if (lock === null) return;
+
+    const pickMs = room.state.rules.slapPickMs;
+    if (pickMs <= 0) return;
+
+    lock.endsAt = this.opts.now() + pickMs;
+    room.state.version += 1;
+    room.lockHandle = this.scheduler.setTimeout(() => this.playLockTimeout(room.code), pickMs);
+  }
+
+  private playLockTimeout(code: RoomCode): void {
+    const room = this.rooms.get(code);
+    if (!room) return;
+    room.lockHandle = null;
+
+    const head = lockHolder(room.state);
+    if (head === null) return;
+
+    const out: Outbound[] = [];
+    const result = reduce(room.state, head.playerId, { a: "slapForfeit", slapperId: head.playerId }, this.ctx());
+    if (result.ok) {
+      room.state = result.state;
+      out.push(...result.out);
+    }
+    room.state.slapLock?.queue.shift();
+    room.state.version += 1;
+
+    this.pumpLock(room, out);
     this.emitAsync(code, out);
   }
 
@@ -505,6 +725,9 @@ export class RoomManager {
     }
     const endsAt = room.state.turnEndsAt;
     if (endsAt === null || room.state.phase === "finished" || room.state.phase === "lobby") return;
+    // A stopped table has no turn clock; it is handed back when the slap queue
+    // empties, with exactly what was left on it.
+    if (isLocked(room.state)) return;
 
     const delay = Math.max(0, endsAt - this.opts.now());
     room.turnHandle = this.scheduler.setTimeout(() => this.playTurnTimeout(room.code), delay);
@@ -554,6 +777,7 @@ export class RoomManager {
 
     room.arbiter.cancel();
     if (room.turnHandle !== null) this.scheduler.clearTimeout(room.turnHandle);
+    if (room.lockHandle !== null) this.scheduler.clearTimeout(room.lockHandle);
     for (const handle of room.graceHandles.values()) this.scheduler.clearTimeout(handle);
 
     for (const seat of room.state.seats) this.revokeSessionsFor(seat.id);
@@ -562,7 +786,7 @@ export class RoomManager {
 }
 
 /** The least damaging legal move for the current phase. */
-function autoPlay(state: GameState): Action | null {
+function autoPlay(state: GameState): EngineAction | null {
   switch (state.phase) {
     case "study":
       return { a: "readyUp" };
@@ -575,7 +799,9 @@ function autoPlay(state: GameState): Action | null {
     case "powerPeekOther":
     case "powerFreeSwap":
     case "powerKing":
-      return { a: "forfeitPower" };
+      // Not `forfeitPower`: at a table where powers are compulsory no player
+      // may decline one, and the clock is not a player.
+      return { a: "powerTimeout" };
     case "slapGiveCard":
       return { a: "slapGive", slot: 0 };
     default:

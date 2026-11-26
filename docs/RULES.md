@@ -21,7 +21,7 @@ hold is your problem: the server shows a peeked card once and never again.
 | Red King | **-1** |
 | Joker | 0 |
 
-A pack is 54 cards. The host picks one, two, or three packs before the round
+A pack is 54 cards. The host picks one to four packs before the round
 starts; more packs means more of every rank in play, so slaps come up far more
 often and the deck runs down more slowly.
 
@@ -46,17 +46,33 @@ On your turn, either:
 ### Powers
 
 A power fires only when the card was drawn from the deck and then discarded.
-Powers are optional — you may always decline one.
+
+**A power you trigger is a power you use.** Discarding a seven from the deck is
+a decision, and the look that follows is its consequence — you do not get to
+take the discard and leave the power on the table. A jack must swap; a king
+must look and then swap.
 
 | Card | Power |
 | --- | --- |
 | 7, 8 | Look at one of your own cards |
 | 9, 10 | Look at one of another player's cards |
 | J, Q | Swap any two cards on the table — two of yours, two of theirs, or one of each |
-| K | Look at any card, then swap any two cards — or pass |
+| K | Look at any card, then swap any two cards |
 
 Everyone sees *which* card you looked at and *which* two you swapped. Nobody
 but you sees a face you were not entitled to.
+
+#### Optional powers
+
+The host may turn this off in the lobby, before the round. Set **Powers** to
+*Optional* and a power becomes an offer: decline it and the turn simply ends,
+and a king may look and then keep both cards. It is the same game otherwise,
+and the rule book on the table says whichever one you are playing.
+
+The one exception in either case is the turn clock. A seat nobody is sitting in
+would hold the table for the rest of the round, so when the clock runs out on
+an unresolved power the server ends the turn — that is the clock unsticking the
+table, not a player declining.
 
 ## Slapping
 
@@ -70,18 +86,49 @@ can slap it. Suit does not matter; a joker matches only a joker.
   You do not get to see what you were given.
 - Empty your hand and the round ends on the spot. Nothing beats zero cards.
 
+### The slap stops the table
+
+Slapping is not something that happens alongside the game. It interrupts it.
+
+**The moment you slap, the table stops and waits for you to turn a card over.**
+Nobody draws, nobody plays a power, nobody calls Cambio. The clock on the turn
+you interrupted is held exactly where it was and handed back afterwards, so
+nobody loses their turn to somebody else's slap.
+
+You have **eight seconds** to name the card. Run out and it costs you the same
+as getting it wrong: a penalty card off the deck. Claiming the table and then
+doing nothing with it has to cost something, or stopping the game would be
+free.
+
+There are two ways to make a slap, and they are the same slap:
+
+- Press **SLAP**, which claims the table, and then click the card. Two steps,
+  and the game is stopped for the second one.
+- Press a **number key** for one of your own cards, which claims and names in
+  one stroke. The table still stops — for no time at all, because the card is
+  already named.
+
+There is no backing out. Pressing SLAP is the slap.
+
 ### Slapping at the same moment as someone else
 
 Two people going for the same card is a queue, not a duel. **A faster slap does
 not cancel a slower one — it only goes first.**
 
 1. Every slap made in the same instant is put in order, earliest first.
-2. The first slap in the queue is played out.
+2. The first slap in the queue is played out. The table stays stopped until it
+   is: that player turns their card over while everyone else waits.
 3. **If it was right, the queue stops.** Everyone behind it keeps their card and
-   pays nothing: being second costs you nothing at all.
-4. **If it was wrong**, the slapper takes their penalty card and the next slap
-   in the queue is played out. Then the third, and so on, until one of them is
-   right or the queue runs out.
+   pays nothing — they are never even asked to turn one over. Being second
+   costs you nothing at all.
+4. **If it was wrong**, the slapper takes their penalty card and the table
+   turns to the next slap in the queue, which now has to be answered the same
+   way: that player turns a card over, and everyone waits again. Then the
+   third, and so on, until one of them is right or the queue runs out.
+
+Somebody slapping while you hold the table does not jump you — it joins the
+back of your queue. Whether they ever have to turn a card over depends entirely
+on whether you got yours right.
 
 So slapping just after someone else is never punished for being late. It is
 only ever a bet that the player ahead of you got it wrong — and if they did,
@@ -131,7 +178,7 @@ Slapping stays live through the final turns.
 
 | Key | What it does |
 | --- | --- |
-| `S` | Arm slapping — then click any card on the table to slap it |
+| `S` | Slap — stops the table, then click any card on it to name yours |
 | `1`–`4` | Slap your own card in that slot outright, with no arming click |
 | `Esc` | Cancel slapping, or a half-made choice |
 | `I` | Open and close this help |

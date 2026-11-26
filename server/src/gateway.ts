@@ -196,6 +196,21 @@ export function createGateway<S>(opts: GatewayOptions<S>): Gateway<S> {
         return;
       }
 
+      case "lobby.powers": {
+        const binding = bySocket.get(socket);
+        if (!binding) {
+          fail(socket, "sessionInvalid", "join a table first");
+          return;
+        }
+        const result = manager.setPowers(binding.code, binding.playerId, msg.optional);
+        if (!result.ok) {
+          fail(socket, result.code, result.message);
+          return;
+        }
+        broadcastState(binding.code);
+        return;
+      }
+
       case "lobby.start": {
         const binding = bySocket.get(socket);
         if (!binding) {

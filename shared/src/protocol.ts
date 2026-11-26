@@ -31,12 +31,26 @@ export type Action =
    */
   | { a: "freeSwap"; aId: PlayerId; aSlot: number; bId: PlayerId; bSlot: number }
   | { a: "kingSkip" }
-  /** Decline a power outright. Powers are optional, and the turn clock uses this. */
+  /**
+   * Decline a power outright. Legal only at a table whose host has made powers
+   * optional; by default a power you triggered is a power you resolve.
+   */
   | { a: "forfeitPower" }
   /* pre-round study phase */
   | { a: "initialPeek"; slot: number }
   | { a: "readyUp" }
   /* slap */
+  /**
+   * Claim a slap without naming a card yet. This is the SLAP button: it puts
+   * you in the queue and stops the table, and the card you mean follows as a
+   * `slap` once the queue reaches you.
+   */
+  | { a: "slapClaim" }
+  /**
+   * Name the card. Sent on its own it both claims and answers in one gesture -
+   * the number-key fast path - and sent while you hold the lock it is the
+   * answer the table is waiting for.
+   */
   | { a: "slap"; targetId: PlayerId; slot: number }
   | { a: "slapGive"; slot: number };
 
@@ -44,13 +58,26 @@ export type Action =
  * Emitted by the arbiter, never sent by a client. One of these is fed to the
  * reducer for each slap the queue actually reaches.
  */
-export type ResolvedAction = {
-  a: "slapResolve";
-  slapperId: PlayerId;
-  targetId: PlayerId;
-  slot: number;
-  marginMs: number | null;
-};
+export type ResolvedAction =
+  | {
+      a: "slapResolve";
+      slapperId: PlayerId;
+      targetId: PlayerId;
+      slot: number;
+      marginMs: number | null;
+    }
+  /**
+   * The lock holder never named a card. Emitted by the clock rather than by a
+   * client: claiming a slap and then not making one costs a card, or stopping
+   * the table would be free.
+   */
+  | { a: "slapForfeit"; slapperId: PlayerId }
+  /**
+   * A power ran out of clock. Emitted by the turn timer only, because at a
+   * table where powers are compulsory no player may walk away from one - and
+   * something still has to unstick a seat nobody is sitting in.
+   */
+  | { a: "powerTimeout" };
 
 export type EngineAction = Action | ResolvedAction;
 
@@ -66,6 +93,8 @@ export type ClientMsg =
   | { t: "lobby.decks"; decks: number }
   /** Host only: which card back the whole table plays with. */
   | { t: "lobby.back"; back: string }
+  /** Host only, lobby only: whether a power may be declined. */
+  | { t: "lobby.powers"; optional: boolean }
   | { t: "lobby.start" }
   /** Deal another round to the same table, once one has finished. */
   | { t: "lobby.restart" }
@@ -131,6 +160,11 @@ export type GameView = {
   turnEndsAt: number | null;
   /** How many packs this table plays with. Set by the host in the lobby. */
   decks: number;
+  /**
+   * Whether a triggered power may be declined. False by default: discard a
+   * card from the deck and you use what it does.
+   */
+  optionalPowers: boolean;
   /** The card back every face-down card wears. Cosmetic, and the host's choice. */
   back: string;
   /** Cards left face down to draw from. */
@@ -164,6 +198,19 @@ export type GameView = {
   finalTurnsRemaining: number | null;
   /** Whether a slap is legal right now. */
   slapOpen: boolean;
+  /**
+   * Set while a slap is being settled. The table is stopped: whoever holds the
+   * lock owes the table a card, everyone behind them waits, and nobody takes a
+   * turn until the queue has emptied.
+   */
+  slapLock: {
+    /** Whose slap the table is waiting on. */
+    holderId: PlayerId;
+    /** Everyone queued behind them, in the order they will be asked. */
+    waiting: PlayerId[];
+    /** When the holder runs out of time to name a card, or null when untimed. */
+    endsAt: number | null;
+  } | null;
   winnerId: PlayerId | null;
 };
 
@@ -205,6 +252,8 @@ export type SlapOutcome =
   | "otherCardDiscarded"
   /** The slap was wrong. The slapper took a card, and the queue moves on. */
   | "wrongRankPenalty"
+  /** The slapper held the table and never named a card. Same cost as a wrong one. */
+  | "noPickPenalty"
   /** An earlier slap in the queue was right, so this one never had to be played. */
   | "lostRace"
   /** The card or the discard top was gone by the time the queue reached it. */

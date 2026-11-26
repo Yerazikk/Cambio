@@ -1,6 +1,6 @@
 import type { Card, PlayerId } from "@cambio/shared";
 import { CardFace, type Flash } from "./Card.js";
-import type { Placement } from "../seating.js";
+import { handPlace, type Placement } from "../seating.js";
 
 export type SeatProps = {
   placement: Placement;
@@ -58,17 +58,16 @@ export function Seat({
    * and the direction the middle of the table lies in, so its cards arrive
    * from the piles rather than from nowhere in particular.
    *
-   * The row count goes out too. A seat's footprint has to be square, so that
-   * turning the hand inside it does not move the name plate, and only this
-   * side knows how many rows a hand of this size takes - a penalty card can
-   * put a fifth on the table at any moment.
+   * A seat's footprint has to be square, so that turning the hand inside it
+   * does not move the name plate - and it is the footprint of four cards
+   * whatever the hand has grown to, because a hand grows sideways out of its
+   * own box rather than pushing the seat about.
    */
   const style = {
     left: `${placement.x}%`,
     top: `${placement.y}%`,
     "--seat-order": placement.turnOffset,
     "--seat-angle": `${placement.angle}deg`,
-    "--seat-rows": Math.max(1, Math.ceil(player.slots.length / 2)),
     "--seat-held": holding && !isYou ? 1 : 0,
     "--deal-x": `${placement.inX * 46}px`,
     "--deal-y": `${placement.inY * 46}px`,
@@ -112,6 +111,7 @@ export function Seat({
                 onClick={() => onSlot(index)}
                 testId={`slot-${player.name}-${index}`}
                 dealIndex={index}
+                place={handPlace(index)}
                 {...(isYou ? { label: String(index + 1) } : {})}
               />
             );

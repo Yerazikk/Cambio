@@ -3,8 +3,13 @@ import type { PlayerId } from "@cambio/shared";
 /** One player's attempt, as the server observed it. */
 export type SlapClaim = {
   playerId: PlayerId;
-  targetId: PlayerId;
-  slot: number;
+  /**
+   * The card this slap means, where the player named one as they made it -
+   * the number-key fast path does. Null for a bare SLAP, which claims a place
+   * in the queue and names its card when the queue gets there.
+   */
+  targetId: PlayerId | null;
+  slot: number | null;
   /** Server clock when the message was read off the socket. */
   arrivalMs: number;
   /** Server-measured one-way latency credited back to this player. */
@@ -137,9 +142,26 @@ export class SlapArbiter {
     return this.pending.length;
   }
 
-  /** Record a slap. The first one opens the window; later ones join that race. */
+  /**
+   * Record a slap. The first one opens the window; later ones join that race.
+   *
+   * A player already in the window does not get a second place in it - but if
+   * their first message was a bare claim and this one names a card, the card
+   * is written onto the claim they already have. That is one gesture arriving
+   * in two packets (press SLAP, then pick), not two slaps.
+   */
   submit(claim: Omit<SlapClaim, "arrivalMs"> & { arrivalMs?: number }): void {
     const arrivalMs = claim.arrivalMs ?? this.opts.now();
+
+    const held = this.pending.find((c) => c.playerId === claim.playerId);
+    if (held !== undefined) {
+      if (held.targetId === null && claim.targetId !== null) {
+        held.targetId = claim.targetId;
+        held.slot = claim.slot;
+      }
+      return;
+    }
+
     this.pending.push({ ...claim, arrivalMs });
 
     if (this.handle === null) {

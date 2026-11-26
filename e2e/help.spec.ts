@@ -9,7 +9,7 @@ test.describe("the rules help", () => {
     await page.getByTestId("rules-button").click();
 
     await expect(page.getByTestId("rules-panel")).toBeVisible();
-    await expect(page.getByTestId("rules-panel")).toContainText(/fewest points/i);
+    await expect(page.getByTestId("rules-panel")).toContainText(/lowest hand wins the round/i);
 
     await page.getByTestId("rules-panel").getByRole("button", { name: "Close" }).click();
     await expect(page.getByTestId("rules-panel")).toBeHidden();
@@ -44,7 +44,7 @@ test.describe("the rules help", () => {
 
     await ana!.page.getByTestId("rules-button").click();
 
-    await expect(ana!.page.getByTestId("rules-panel")).toContainText(/a faster slap does not cancel a slower one/i);
+    await expect(ana!.page.getByTestId("rules-panel")).toContainText(/a queue, not a duel/i);
     // Reading the rules is not playing: no card became a slap target.
     await expect(ana!.slot(0)).not.toHaveClass(/card--slap/);
 

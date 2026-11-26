@@ -46,7 +46,11 @@ export type GameStore = {
   log: LogLine[];
   /** Set for as long as a fresh hand is being dealt out to the seats. */
   dealing: boolean;
-  /** While armed, clicking any card slaps it instead of playing it. */
+  /**
+   * Set between pressing SLAP and the server confirming the table has stopped
+   * on you. Local, and optimistic: once the lock arrives in the view, that is
+   * the authority on who is picking.
+   */
   slapArmed: boolean;
   /** Set the instant a slap is sent, for feedback that does not wait for the server. */
   slapPending: boolean;
@@ -58,11 +62,16 @@ export type GameStore = {
   kick: (playerId: PlayerId) => void;
   setDecks: (decks: number) => void;
   setBack: (back: string) => void;
+  /** Host only, lobby only: whether a triggered power may be declined. */
+  setPowers: (optional: boolean) => void;
   start: () => void;
   restart: () => void;
   act: (action: Action) => void;
+  /** Say something in passing, in the same place every other notice appears. */
+  notify: (text: string) => void;
 
-  armSlap: (armed: boolean) => void;
+  /** Press SLAP: claims a place in the queue and stops the table. */
+  claimSlap: () => void;
   slap: (targetId: PlayerId, slot: number) => void;
   setPick: (pick: PickOne) => void;
   dismissKick: () => void;
@@ -72,7 +81,6 @@ export type GameStore = {
   pileFlash: (pile: "deck" | "discard") => boolean;
 };
 
-const SLAP_ARM_MS = 3_000;
 const TOAST_MS = 3_500;
 /** How long a move stays visible as an animation. Long enough to catch across the table. */
 const FLASH_MS = 1_100;
@@ -297,12 +305,16 @@ export function useGame(): GameStore {
     return () => clearTimeout(timer);
   }, [dealing]);
 
-  /** Slap mode disarms itself, so a stray later click does not slap by accident. */
+  /*
+   * Once the table has actually stopped on the slap, the view is the authority
+   * on who is picking and the optimistic flag has done its job. It is dropped
+   * rather than left to time out: a claimed slap is not a mode you can fall
+   * out of, you owe the table a card either way.
+   */
   useEffect(() => {
     if (!slapArmed) return;
-    const timer = setTimeout(() => setSlapArmed(false), SLAP_ARM_MS);
-    return () => clearTimeout(timer);
-  }, [slapArmed]);
+    if (view?.slapLock != null) setSlapArmed(false);
+  }, [slapArmed, view?.slapLock]);
 
   const send = useCallback((msg: ClientMsg) => connection.current?.send(msg), []);
 
@@ -319,6 +331,19 @@ export function useGame(): GameStore {
     },
     [send],
   );
+
+  /**
+   * Press SLAP without naming a card yet.
+   *
+   * This is the gesture that stops the table: from here the game waits on you
+   * until you flip a card over, so there is nothing to cancel and nothing to
+   * time out locally - the server is holding the queue.
+   */
+  const claimSlap = useCallback(() => {
+    setSlapArmed(true);
+    setPick(null);
+    send({ t: "act", action: { a: "slapClaim" } });
+  }, [send]);
 
   const revealFor = useCallback(
     (ownerId: PlayerId, slot: number): Card | null =>
@@ -362,10 +387,12 @@ export function useGame(): GameStore {
       kick: (playerId) => send({ t: "lobby.kick", playerId }),
       setDecks: (decks) => send({ t: "lobby.decks", decks }),
       setBack: (back) => send({ t: "lobby.back", back }),
+      setPowers: (optional) => send({ t: "lobby.powers", optional }),
       start: () => send({ t: "lobby.start" }),
       restart: () => send({ t: "lobby.restart" }),
       act,
-      armSlap: setSlapArmed,
+      notify: (text) => pushToast("info", text),
+      claimSlap,
       slap,
       setPick,
       dismissKick: () => setKicked(null),
@@ -387,7 +414,9 @@ export function useGame(): GameStore {
       pick,
       send,
       act,
+      pushToast,
       slap,
+      claimSlap,
       revealFor,
       flashFor,
       pileFlash,
@@ -491,6 +520,11 @@ function describeSlap(
       return [mine ? "good" : "info", `${slapper} slapped someone else's card${by}`];
     case "wrongRankPenalty":
       return [mine ? "bad" : "info", `${slapper} slapped wrong and took a card`];
+    case "noPickPenalty":
+      return [
+        mine ? "bad" : "info",
+        mine ? "You ran out of time to pick and took a card" : `${slapper} never picked and took a card`,
+      ];
     case "lostRace":
       // Being behind in the queue is a reprieve, not a loss: the slap ahead of
       // yours was right, so yours never had to be played.
