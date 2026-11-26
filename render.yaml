@@ -1,0 +1,26 @@
+# One service: the Node server builds the client and then serves it alongside
+# the WebSocket endpoint, so the page and its socket always share an origin.
+# Splitting the client out into a Render static site would break that - the
+# client carries no server URL at all, by design.
+#
+# `buildCommand` replaces Render's default `npm install` rather than running
+# after it, so the install has to be spelled out here. It must install
+# devDependencies too, since typescript and vite build the bundle: do not set
+# NODE_ENV=production as a service env var, or npm will skip them and the
+# build will fail.
+#
+# Node and npm come from .nvmrc and engines.npm.
+services:
+  - type: web
+    name: cambio
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    # Room state lives in a Map in the room manager, so a second instance would
+    # strand players who share a room code on separate copies of the game. The
+    # free plan is single-instance regardless; this is the note for whoever
+    # later finds the scaling slider on a paid plan.
