@@ -18,7 +18,7 @@ export function isInitialPeekSlot(slot: number, handSize: number, initialPeeks: 
 }
 /** Table size bounds. */
 export const MIN_PLAYERS = 2;
-export const MAX_PLAYERS = 6;
+export const MAX_PLAYERS = 8;
 
 /**
  * How many packs the table plays with, and the range the host may pick from.

@@ -2,7 +2,6 @@ import {
   CARDS_PER_DECK,
   CARD_BACKS,
   DECK_CHOICES,
-  MAX_PLAYERS,
   MIN_PLAYERS,
   type GameView,
   type PlayerId,
@@ -60,9 +59,7 @@ export function Lobby({
         </button>
       </header>
 
-      <p className="lobby__blurb">
-        Share that code. {MIN_PLAYERS}&ndash;{MAX_PLAYERS} players; the host starts the round.
-      </p>
+      <p className="lobby__blurb">Share the code.</p>
 
       <ul className="lobby__players">
         {view.players.map((player) => (

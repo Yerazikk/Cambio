@@ -73,8 +73,8 @@ another round with the same table.
 ## The table
 
 You are looking down at one table from above. Everyone has a seat on its rim,
-spaced evenly round it - four players make a square, five a pentagon, six a
-hexagon - and the seats keep the order the players are listed in, so the person
+spaced evenly round it - four players make a square, five a pentagon, eight an
+octagon - and the seats keep the order the players are listed in, so the person
 who plays after you is on your left and play runs clockwise. You are always at
 the bottom, facing your own hand, which means every player learns the same
 layout and the same place to look for their own cards.
@@ -255,7 +255,7 @@ of ceremony to look at one lobby, so there is a harness:
 http://localhost:5173/dev.html
 ```
 
-It seats two to six players side by side on one screen. The first pane creates
+It seats two to eight players side by side on one screen. The first pane creates
 the table and the rest join it, so the lobby is live the moment the page loads
 and you play the panes — every move showing at once on every screen it should
 show on, which is the half of this game that only exists between clients.
