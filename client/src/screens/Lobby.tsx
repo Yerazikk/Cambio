@@ -7,6 +7,7 @@ import {
   type PlayerId,
 } from "@cambio/shared";
 import { backImageUrl } from "../backs.js";
+import { Crowned } from "../components/Crown.js";
 
 export type LobbyProps = {
   view: GameView;
@@ -65,9 +66,8 @@ export function Lobby({
         {view.players.map((player) => (
           <li key={player.id} className="lobby__player" data-testid={`lobby-player-${player.name}`}>
             <span className="lobby__playerName">
-              {player.name}
+              <Crowned name={player.name} isHost={player.isHost} />
               {player.id === me && <span className="chip chip--quiet">you</span>}
-              {player.isHost && <span className="chip chip--brass">host</span>}
               {!player.connected && <span className="chip chip--quiet">away</span>}
             </span>
             {amHost && player.id !== me && (

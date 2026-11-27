@@ -1,5 +1,6 @@
 import type { Card, PlayerId } from "@cambio/shared";
 import { CardFace, type Flash } from "./Card.js";
+import { Crowned } from "./Crown.js";
 import { handPlace, type Placement } from "../seating.js";
 
 export type SeatProps = {
@@ -77,9 +78,8 @@ export function Seat({
     <section className={classes.join(" ")} style={style} data-testid={`seat-${player.name}`} aria-label={`${player.name}'s hand`}>
       <header className="seat__head">
         <span className="seat__name">
-          {player.name}
+          <Crowned name={player.name} isHost={player.isHost} />
           {isYou && <span className="chip chip--quiet">you</span>}
-          {player.isHost && <span className="chip chip--brass">host</span>}
         </span>
         <span className="seat__meta">
           {!player.connected && (

@@ -155,13 +155,6 @@ h3 {
   flex-direction: column;
   gap: 0.45rem;
 }
-/* A label is a caption, not a rule of small caps: 12/16 at 500, no tracking. */
-.field__label {
-  font: 500 12px/16px var(--sans);
-  letter-spacing: 0;
-  color: var(--muted);
-  padding-left: 1.25rem;
-}
 /*
  * A field is a capsule of the same veil as a button, with no rim at all. The
  * caret is the accent, which with the focus ring is the only place the accent
@@ -226,11 +219,6 @@ kbd {
   color: var(--ink);
   white-space: nowrap;
 }
-.chip--brass {
-  background: var(--gl-well-light);
-  color: var(--ink);
-  box-shadow: var(--e1);
-}
 /*
  * Called Cambio: the one thing at a seat that needs watching, and the only
  * bold word in the interface.
@@ -263,6 +251,107 @@ kbd {
   background: transparent;
   color: var(--faint);
   padding: 0 4px;
+}
+
+/*
+ * The host's crown.
+ *
+ * It is worn rather than carried: it sits on the first letter of the name,
+ * tipped to the left the way a crown sits on a head. The interface is set in
+ * a monospace face, so the middle of that letter is exactly 0.5ch in and the
+ * position needs no measuring. Everything else here is in `em`, so one rule
+ * fits the 15px name in the lobby and the 13px one at a seat.
+ */
+.crowned {
+  position: relative;
+  display: inline-block;
+}
+.crown {
+  --crown-tilt: -20deg;
+  position: absolute;
+  /*
+   * Over the middle of the first letter, and low enough to rest on it rather
+   * than float above it. The nudge past 0.5ch pays for the tilt: rotating
+   * about the crown's foot carries its mass to the left, so centring the
+   * upright shape would leave the tilted one hanging off the letter's
+   * shoulder.
+   */
+  left: 0.66ch;
+  top: -0.34em;
+  width: 1.2em;
+  height: 0.8em;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform-origin: 50% 90%;
+  transform: translateX(-50%) rotate(var(--crown-tilt));
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 180ms var(--ease-back);
+}
+.crown__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--gl-gold-deep) 40%, transparent));
+}
+/* One flat shape. A crown this small is a silhouette; anything drawn inside
+   it turns to noise at 10 pixels tall. */
+.crown__body {
+  fill: var(--gl-gold);
+}
+/* Pointing at it lifts it off the letter a little; pressing it sets it down. */
+.crown:hover {
+  transform: translateX(-50%) translateY(-1px) rotate(calc(var(--crown-tilt) - 4deg));
+}
+.crown:focus-visible {
+  outline: none;
+  border-radius: 2px;
+  box-shadow: var(--gl-ring);
+}
+
+/*
+ * What the crown means, for anyone who would rather be told. It is a label on
+ * an ornament rather than a control, so it waits for the pointer and never
+ * takes a click of its own.
+ */
+.crown__say {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.3em);
+  transform: translateX(-50%) rotate(calc(var(--crown-tilt) * -1));
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: #fff;
+  font: 500 10px/14px var(--sans);
+  letter-spacing: 0;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms var(--ease-io);
+}
+.crown:hover .crown__say,
+.crown:focus-visible .crown__say {
+  opacity: 1;
+}
+
+/*
+ * Pressed: one hop, and back down where it sat. The lift is in `em`, so it
+ * is the same hop relative to the name at a seat as in the lobby.
+ */
+.crown--bob {
+  animation: crown-bob 340ms var(--ease-out);
+}
+@keyframes crown-bob {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0) rotate(var(--crown-tilt));
+  }
+  42% {
+    transform: translateX(-50%) translateY(-0.26em) rotate(var(--crown-tilt));
+  }
 }
 
 /*
@@ -1689,16 +1778,27 @@ kbd {
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition:
-    background 160ms var(--ease-io),
-    color 180ms var(--ease-io);
+  /*
+   * No transition, deliberately. The pill and the word on it have to change
+   * in the same frame: fading white ink in over an ink capsule spends most of
+   * the fade at a grey that reads as the label having gone missing and come
+   * back. A control that answers on the frame you pressed it feels quicker
+   * than one that eases, and there is nothing here worth watching move.
+   */
 }
 /* A stop whose label is a word rather than a digit. */
 .decks__choice--wide {
   min-width: 0;
   padding: 0 18px;
 }
-.decks__choice:not(:disabled):hover {
+/*
+ * Hover darkens an unchosen stop towards ink. It must exclude the chosen one:
+ * `:not(:disabled):hover` outweighs `.decks__choice--on` on specificity, so
+ * without this the stop you just clicked keeps its hover colour - ink on an
+ * ink capsule - and its label is invisible until the pointer leaves. That is
+ * the flicker, and it was never the transition.
+ */
+.decks__choice:not(:disabled):not(.decks__choice--on):hover {
   color: var(--ink);
 }
 .decks__choice:focus-visible {
@@ -1746,6 +1846,10 @@ kbd {
 }
 .backs__choice:not(:disabled):hover {
   transform: translateY(-3px);
+}
+/* The lift is for every back; the shadow would paint over the chosen one's
+   ring, which outranks it the same way the stop's hover colour did. */
+.backs__choice:not(:disabled):not(.backs__choice--on):hover {
   box-shadow: var(--e2);
 }
 .backs__choice:focus-visible {

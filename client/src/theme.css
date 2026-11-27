@@ -170,6 +170,14 @@ html[data-tint="slate"] {
   --card-red: #c4503c;
   --card-back-ground: #e6e8e1;
 
+  /* ---- gold, for the host's crown. A crown is an object rather than a
+          surface, like a playing card, so it is the same metal whatever the
+          page is painted: a body, a lit face for its jewels, and a darker
+          edge to draw it with. */
+  --gl-gold: #d2a12c;
+  --gl-gold-lit: #f2d577;
+  --gl-gold-deep: #8a6210;
+
   /* ---- the colour of a called Cambio. Deeper than the red of a heart and
           far deeper than ember, because it is not a status that will pass:
           once it is called it is called, and the round is ending. It sits

@@ -34,14 +34,19 @@ export function Home({ onCreate, onJoin, disabled }: HomeProps): React.JSX.Eleme
           else if (canCreate) onCreate(trimmed);
         }}
       >
+        {/*
+          Two fields, each labelled by what it is waiting for rather than by a
+          caption above it. A form this short does not need both, and the
+          placeholder is where the eye already is.
+        */}
         <label className="field">
-          <span className="field__label">Your name</span>
           <input
             className="field__input"
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={16}
-            placeholder="Ana"
+            placeholder="Your name"
+            aria-label="Your name"
             autoFocus
             data-testid="name-input"
           />
@@ -65,12 +70,12 @@ export function Home({ onCreate, onJoin, disabled }: HomeProps): React.JSX.Eleme
 
         <div className="home__join">
           <label className="field">
-            <span className="field__label">Table code</span>
             <input
               className="field__input field__input--code"
               value={code}
               onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))}
-              placeholder="ABC234"
+              placeholder="CODE"
+              aria-label="Table code"
               data-testid="code-input"
             />
           </label>

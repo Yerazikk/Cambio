@@ -53,3 +53,6 @@ playwright-report/
 blob-report/
 .playwright/
 playwright/.cache/
+
+# Borrowed design kit, kept local as reference
+Yassify/
