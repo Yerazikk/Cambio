@@ -75,6 +75,8 @@ export function Game({ game }: { game: GameStore }): React.JSX.Element {
           dealing={game.dealing}
           pick={game.pick}
           log={game.log}
+          flights={game.flights}
+          landed={game.landed}
           act={game.act}
           slap={game.slap}
           claimSlap={game.claimSlap}

@@ -74,7 +74,19 @@ export function Seat({
   } as React.CSSProperties;
 
   return (
-    <section className={classes.join(" ")} style={style} data-testid={`seat-${player.name}`} aria-label={`${player.name}'s hand`}>
+    <section
+      className={classes.join(" ")}
+      style={style}
+      data-testid={`seat-${player.name}`}
+      /*
+       * The seat itself is an anchor as well as each card in it: a card that
+       * flies out of somewhere that has since stopped existing - the drawn
+       * card, once it has been played - still has to come from the right
+       * part of the table.
+       */
+      data-anchor={`seat:${player.id}`}
+      aria-label={`${player.name}'s hand`}
+    >
       <header className="seat__head">
         {/*
           No crown here, unlike the lobby. Who set the table up stops being
@@ -121,7 +133,9 @@ export function Seat({
                 <span
                   key={`gap-${index}`}
                   className="card card--hole"
-                  data-testid={`hole-${player.name}-${index}`}
+                  data-testid={`slot-${player.name}-${index}`}
+                  data-anchor={`slot:${player.id}:${index}`}
+                  data-hole=""
                   aria-label="an empty place in the hand"
                   style={{ "--slot-i": index, "--col": handPlace(index).col, "--row": handPlace(index).row } as React.CSSProperties}
                 />
@@ -136,6 +150,7 @@ export function Seat({
                 flash={flashFor(player.id, index)}
                 onClick={() => onSlot(index)}
                 testId={`slot-${player.name}-${index}`}
+                anchor={`slot:${player.id}:${index}`}
                 dealIndex={index}
                 place={handPlace(index)}
                 {...(isYou && slot.kind !== "gap" ? { label: String(index + 1) } : {})}
@@ -152,7 +167,7 @@ export function Seat({
         */}
         {holding && !isYou && (
           <div className="seat__held" data-testid={`held-${player.name}`}>
-            <CardFace card={heldCard} />
+            <CardFace card={heldCard} anchor={`held:${player.id}`} />
             <span className="seat__heldTag">{heldFromDiscard ? "taken" : "drawn"}</span>
           </div>
         )}

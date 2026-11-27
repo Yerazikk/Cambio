@@ -56,6 +56,7 @@ export function Piles({
             state={canDrawDeck && !slapArmed ? "targetable" : "idle"}
             onClick={onDrawDeck}
             testId="deck"
+            anchor="deck"
           />
         </div>
         <span className="pile__label">
@@ -71,6 +72,7 @@ export function Piles({
             state={discardLive ? "targetable" : "idle"}
             onClick={canDiscardDrawn ? onDiscardDrawn : onDrawDiscard}
             testId="discard"
+            anchor="discard"
           />
         </div>
         <span className="pile__label">

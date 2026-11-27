@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { INITIAL_PEEKS, isInitialPeekSlot, type Action, type Card, type GameView, type PlayerId } from "@cambio/shared";
 import { CardFace, type Flash } from "../components/Card.js";
+import { Flights, type Flight } from "../components/Flights.js";
 import { Piles } from "../components/Piles.js";
 import { Seat } from "../components/Seat.js";
 import { SlapBar } from "../components/SlapBar.js";
@@ -22,6 +23,9 @@ export type TableProps = {
   dealing: boolean;
   pick: PickOne;
   log: LogLine[];
+  /** Cards crossing the table, so a move can be watched rather than deduced. */
+  flights: Flight[];
+  landed: (id: number) => void;
   act: (action: Action) => void;
   slap: (targetId: PlayerId, slot: number) => void;
   /** Press SLAP: claims a place in the queue and stops the table. */
@@ -37,7 +41,7 @@ type SlotState = "idle" | "targetable" | "selected" | "slap";
 
 export function Table(props: TableProps): React.JSX.Element {
   const { view, me, slapArmed, slapPending, slapPulse, keysHeld, dealing, pick, log, act, slap, claimSlap, setPick } = props;
-  const { revealFor, flashFor, pileFlash, onLeave } = props;
+  const { revealFor, flashFor, pileFlash, flights, landed, onLeave } = props;
 
   const myTurn = view.turnPlayerId === me;
   const mySeat = view.players.find((p) => p.id === me);
@@ -271,10 +275,21 @@ export function Table(props: TableProps): React.JSX.Element {
         */}
         {view.heldBy === me && (
           <div className="hand" data-testid="held-card">
-            <CardFace card={view.heldCard} />
+            <CardFace card={view.heldCard} anchor={`held:${me}`} />
             <span className="hand__tag">{view.heldFromDiscard ? "taken" : "drawn"}</span>
           </div>
         )}
+
+        {/*
+          Over everything on the felt, because a card in the air is above the
+          table. It is the last thing in here so it is the last thing painted.
+        */}
+        <Flights
+          flights={flights}
+          discardTop={view.discardTop}
+          heldCard={view.heldCard}
+          onLanded={landed}
+        />
 
         <TableLog lines={log} />
       </div>

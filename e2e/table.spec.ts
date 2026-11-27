@@ -102,6 +102,43 @@ test.describe("watching the other players", () => {
     for (const player of players) await player.close();
   });
 
+  /*
+   * The ring says a card was touched; the card crossing the felt says where
+   * it went. In a game played face down that journey is most of what anyone
+   * can actually see of another player's turn, so it is worth pinning down.
+   */
+  test("flies the cards across the table and clears them up when they land", async ({ browser }) => {
+    const { players } = await seatTable(browser, ["Ana", "Bo"]);
+    await startRound(players);
+    const actor = await currentPlayer(players);
+    const other = players.find((p) => p !== actor)!;
+
+    // Drawing sends one card: deck to hand.
+    await actor.page.getByTestId("deck").click();
+    await expect(other.page.locator(".flight")).toHaveCount(1);
+    await expect(other.page.locator(".flight")).toHaveCount(0, { timeout: 4_000 });
+
+    /*
+     * Swapping it in sends two in opposite directions: the drawn card into
+     * the slot, and the card it displaces out to the pile. The one going to
+     * the pile is face up, because that is where it has landed - and it must
+     * be the card that actually landed there, not the one that was on top
+     * before it.
+     */
+    await actor.slot(1).click();
+    const flying = other.page.locator(".flight");
+    await expect(flying).toHaveCount(2);
+    await expect(flying.locator(".card--up")).toHaveCount(1);
+
+    // The pile's text is the rank over the suit, so the rank is its first line.
+    const top = (await other.page.getByTestId("discard").innerText()).trim();
+    await expect(flying.locator(".card--up")).toContainText(top.split("\n")[0]!);
+
+    await expect(flying).toHaveCount(0, { timeout: 4_000 });
+
+    for (const player of players) await player.close();
+  });
+
   test("flashes both ends of a swap, and names them in the log", async ({ browser }) => {
     const { players } = await seatTable(browser, ["Ana", "Bo"]);
     await startRound(players);

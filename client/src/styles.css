@@ -656,6 +656,66 @@ kbd {
   outline-offset: 4px;
 }
 
+/* ------------------------------------------------------- cards in the air */
+
+/*
+ * The layer a travelling card is drawn on.
+ *
+ * It covers the felt and nothing else, so a flight's coordinates are measured
+ * against the same box the seats are placed in, and it never takes a click:
+ * what is underneath it is the real table, and this is only a picture of a
+ * card on its way somewhere.
+ */
+.flights {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Above the seats and the piles. A card in the air is above the table. */
+  z-index: 20;
+}
+
+/*
+ * One card crossing the table.
+ *
+ * Positioned by its middle rather than its corner, because a hand is turned
+ * to face whoever is sitting at it and a turned card's bounding box is the
+ * wrong shape - but its middle is still its middle. The card flies upright
+ * whatever seat it came from: it has been picked up off the felt, and a card
+ * in someone's hand is not lying at an angle to anybody.
+ */
+.flight {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--card-w, 52px);
+  height: var(--card-h, 74px);
+  margin-left: calc(var(--card-w, 52px) / -2);
+  margin-top: calc(var(--card-h, 74px) / -2);
+  will-change: transform;
+  animation: flight var(--fdur, 520ms) var(--ease-io) forwards;
+}
+/*
+ * Lifted in the middle of the trip rather than slid flat across. A card being
+ * moved on a real table comes up off it, travels, and is put down - and the
+ * rise is also what keeps the card readable as it passes over the hands and
+ * piles between its two ends.
+ */
+@keyframes flight {
+  0% {
+    transform: translate(var(--fx0), var(--fy0)) scale(1);
+  }
+  50% {
+    transform: translate(calc((var(--fx0) + var(--fx1)) / 2), calc((var(--fy0) + var(--fy1)) / 2)) scale(1.22);
+  }
+  100% {
+    transform: translate(var(--fx1), var(--fy1)) scale(1);
+  }
+}
+.flight .card {
+  box-shadow: 0 calc(var(--card-h, 74px) * 0.14) calc(var(--card-h, 74px) * 0.2) -6px
+    color-mix(in srgb, var(--tint-ink) 38%, transparent);
+}
+
 /* ------------------------------------------------------ what just happened */
 
 /*
@@ -665,9 +725,13 @@ kbd {
  * across a real table.
  *
  * The ring stays for as long as the move is live, so a player who glances over
- * a beat late still sees which card it was; the motion on top of it is for
- * whoever was watching when it landed. The accent is a look, ink a trade, leaf
- * a card arriving, ember a slap or a penalty.
+ * a beat late still sees which card it was; the card flying across the felt on
+ * top of it is for whoever was watching when it landed.
+ *
+ * The accent does the looking and the arriving both: a card landing used to be
+ * leaf, and two greens-against-blues at one table was a distinction nobody was
+ * reading. Where a card went is now said by watching it go, which is a better
+ * answer than a second colour was. Ink is a trade, ember a slap or a penalty.
  */
 .card--did-peek,
 .card--did-swap,
@@ -685,7 +749,7 @@ kbd {
 }
 .card--did-replace,
 .card--did-give {
-  --ring: var(--working);
+  --ring: var(--active);
 }
 .card--did-penalty,
 .card--did-slap {

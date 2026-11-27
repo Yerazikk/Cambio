@@ -18,6 +18,11 @@ export type CardFaceProps = {
   flash?: Flash | null;
   onClick?: () => void;
   testId?: string;
+  /**
+   * A name for this card's place on the table, so a card flying between two
+   * places can find both ends of its trip. See `Flights`.
+   */
+  anchor?: string;
   /** Where this card sits in its hand, which is the order it is dealt in. */
   dealIndex?: number;
   /** Which column and row of its owner's hand this card lies in. */
@@ -53,6 +58,7 @@ export function CardFace({
   flash = null,
   onClick,
   testId,
+  anchor,
   dealIndex,
   place,
 }: CardFaceProps): React.JSX.Element {
@@ -114,7 +120,13 @@ export function CardFace({
 
   if (!interactive) {
     return (
-      <div className={classes.join(" ")} data-testid={testId} aria-label={described} style={style}>
+      <div
+        className={classes.join(" ")}
+        data-testid={testId}
+        data-anchor={anchor}
+        aria-label={described}
+        style={style}
+      >
         {inside}
       </div>
     );
@@ -125,6 +137,7 @@ export function CardFace({
       type="button"
       className={classes.join(" ")}
       data-testid={testId}
+      data-anchor={anchor}
       onClick={onClick}
       style={style}
       aria-label={`${described} - ${state === "slap" ? "slap this card" : "choose this card"}`}

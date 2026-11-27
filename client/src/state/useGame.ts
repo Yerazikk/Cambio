@@ -12,6 +12,7 @@ import type {
   TableEventKind,
 } from "@cambio/shared";
 import type { Flash } from "../components/Card.js";
+import type { Flight } from "../components/Flights.js";
 import { clearToken, connect, readToken, type ConnectionStatus, type Connection } from "../net/socket.js";
 
 /** A card currently face up on this player's screen, and when it flips back. */
@@ -46,6 +47,10 @@ export type GameStore = {
   log: LogLine[];
   /** Set for as long as a fresh hand is being dealt out to the seats. */
   dealing: boolean;
+  /** Cards currently crossing the table, so a move can be watched happening. */
+  flights: Flight[];
+  /** Drop a flight that has landed. */
+  landed: (id: number) => void;
   /**
    * Set between pressing SLAP and the server confirming the table has stopped
    * on you. Local, and optimistic: once the lock arrives in the view, that is
@@ -119,6 +124,7 @@ export function useGame(): GameStore {
   const [piles, setPiles] = useState<PileFlash[]>([]);
   const [log, setLog] = useState<LogLine[]>([]);
   const [dealing, setDealing] = useState(false);
+  const [flights, setFlights] = useState<Flight[]>([]);
   const [slapArmed, setSlapArmed] = useState(false);
   const [slapPending, setSlapPending] = useState(false);
   /** When the red the table flashes on a landed slap finishes fading. */
@@ -127,6 +133,7 @@ export function useGame(): GameStore {
 
   const connection = useRef<Connection | null>(null);
   const toastId = useRef(0);
+  const flightId = useRef(0);
   const logId = useRef(0);
   /** The phase we last saw, so a fresh deal can be told from a normal update. */
   const phaseRef = useRef<Phase | null>(null);
@@ -163,6 +170,46 @@ export function useGame(): GameStore {
     setPiles((current) => [...current.filter((p) => p.pile !== pile), { pile, expiresAt }]);
   }, []);
 
+  /**
+   * Hold a card's trip until the table it crosses has caught up.
+   *
+   * A move arrives as two messages - what happened, and then the new state -
+   * and they are separate socket events, so they are separate renders. A
+   * flight drawn on the first of them measures a table that has not moved
+   * yet and reads a discard pile whose top card is still the old one, which
+   * is how a card on its way to the pile came out printed as the card
+   * already lying on it.
+   *
+   * So trips are queued here and let go in `flush`, on the state that
+   * follows. Every path on the server broadcasts state after its events, so
+   * one always does - and `flush` is called on a timer as well, in case a
+   * day comes when one does not.
+   */
+  const pending = useRef<Omit<Flight, "id">[]>([]);
+
+  const flush = useCallback(() => {
+    const trips = pending.current;
+    if (trips.length === 0) return;
+    pending.current = [];
+    setFlights((current) => [...current, ...trips.map((trip) => ({ ...trip, id: ++flightId.current }))]);
+  }, []);
+
+  const fly = useCallback(
+    (trips: Omit<Flight, "id">[]) => {
+      if (trips.length === 0) return;
+      // A table with motion turned off gets none of this. The rings still say
+      // what happened; they just say it without anything moving.
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+      pending.current.push(...trips);
+      setTimeout(flush, 120);
+    },
+    [flush],
+  );
+
+  const landed = useCallback((id: number) => {
+    setFlights((current) => current.filter((f) => f.id !== id));
+  }, []);
+
   const pushLog = useCallback((text: string) => {
     const id = ++logId.current;
     setLog((current) => [...current, { id, text }].slice(-LOG_LINES));
@@ -185,6 +232,8 @@ export function useGame(): GameStore {
             setReveals([]);
             setFlashes([]);
             setPiles([]);
+            setFlights([]);
+            pending.current = [];
             setLog([]);
             // A new hand is on its way out to the seats.
             setDealing(true);
@@ -196,6 +245,8 @@ export function useGame(): GameStore {
             if (previous !== null && event.view.version < previous.version) return previous;
             return event.view;
           });
+          // The table has moved, so whatever was waiting to cross it can go.
+          flush();
           for (const player of event.view.players) namesRef.current.set(player.id, player.name);
           return;
         }
@@ -218,6 +269,7 @@ export function useGame(): GameStore {
           if (flash !== null) markFlash(flash, event.slots);
           const pile = PILE_FOR[event.kind];
           if (pile !== null) markPile(pile);
+          fly(tripsFor(event.kind, event.byId, event.slots));
           pushLog(describeTableEvent(event.kind, event.byId, event.slots, namesRef.current, meRef.current));
           return;
         }
@@ -243,6 +295,14 @@ export function useGame(): GameStore {
            */
           if (event.card !== null) {
             const card = event.card;
+            // And it crosses the table to the pile it is now on top of.
+            fly([
+              {
+                from: [`slot:${event.targetId}:${event.slot}`, `seat:${event.targetId}`],
+                to: ["discard"],
+                face: card,
+              },
+            ]);
             setReveals((current) => [
               ...current.filter((r) => !(r.ownerId === event.targetId && r.slot === event.slot)),
               { ownerId: event.targetId, slot: event.slot, card, expiresAt: Date.now() + SLAP_REVEAL_MS },
@@ -285,7 +345,7 @@ export function useGame(): GameStore {
           return;
       }
     },
-    [pushToast, markFlash, markPile, pushLog],
+    [pushToast, markFlash, markPile, pushLog, fly, flush],
   );
 
   useEffect(() => {
@@ -412,6 +472,8 @@ export function useGame(): GameStore {
       reveals,
       log,
       dealing,
+      flights,
+      landed,
       slapArmed,
       slapPending,
       slapPulse: slapPulse > Date.now(),
@@ -450,6 +512,8 @@ export function useGame(): GameStore {
       reveals,
       log,
       dealing,
+      flights,
+      landed,
       slapArmed,
       slapPending,
       slapPulse,
@@ -464,6 +528,62 @@ export function useGame(): GameStore {
       pileFlash,
     ],
   );
+}
+
+/**
+ * Which cards a move sends across the table, and between where.
+ *
+ * Every end is a list, because a trip can start somewhere that has stopped
+ * existing by the time it is drawn: the card somebody has drawn is gone from
+ * the table the instant they play it, so the seat it was held at stands in
+ * behind it.
+ *
+ * `peek` and `cambio` send nothing. Nothing moved - a look is a look - and a
+ * card gliding about to say otherwise would be a lie about the state.
+ */
+function tripsFor(kind: TableEventKind, byId: PlayerId, slots: readonly SlotRef[]): Omit<Flight, "id">[] {
+  const held = [`held:${byId}`, `seat:${byId}`];
+  const at = (ref: SlotRef): string[] => [`slot:${ref.ownerId}:${ref.slot}`, `seat:${ref.ownerId}`];
+  const [a, b] = slots;
+
+  switch (kind) {
+    case "draw":
+      return [{ from: ["deck"], to: held, face: "down" }];
+    // Face up both ways: it was the top of the pile, so the table read it on
+    // the way out and there is nothing to hide on the way across.
+    case "take":
+      return [{ from: ["discard"], to: held, face: "heldCard" }];
+    case "discard":
+      return [{ from: held, to: ["discard"], face: "discardTop" }];
+    /*
+     * Two cards, in opposite directions: the drawn one going into the hand,
+     * and the one it displaces leaving for the pile. Both ends of the trade
+     * are the same slot, which is exactly what the move is.
+     */
+    case "replace":
+      return a === undefined
+        ? []
+        : [
+            { from: held, to: at(a), face: "down" },
+            { from: at(a), to: ["discard"], face: "discardTop" },
+          ];
+    case "swap":
+      return a === undefined || b === undefined
+        ? []
+        : [
+            { from: at(a), to: at(b), face: "down" },
+            { from: at(b), to: at(a), face: "down" },
+          ];
+    case "give":
+      return a === undefined || b === undefined ? [] : [{ from: at(a), to: at(b), face: "down" }];
+    case "penalty":
+      return a === undefined ? [] : [{ from: ["deck"], to: at(a), face: "down" }];
+    case "peek":
+    case "cambio":
+      return [];
+    default:
+      return [];
+  }
 }
 
 /** The animation each move plays on the cards it touched. */
