@@ -147,6 +147,22 @@ export function useGame(): GameStore {
    * the player's own name.
    */
   const meRef = useRef<PlayerId | null>(null);
+  /**
+   * Cards waiting to cross the table, held until the table catches up.
+   *
+   * A move arrives as two messages - what happened, and then the new state -
+   * and they are separate socket events, so they are separate renders. A
+   * flight drawn on the first of them measures a table that has not moved
+   * yet and reads a discard pile whose top card is still the old one, which
+   * is how a card on its way to the pile came out printed as the card
+   * already lying on it.
+   *
+   * So `fly` queues here and `flush` lets go, on the state that follows.
+   * Every path on the server broadcasts state after its events, so one
+   * always does - and `flush` runs on a timer too, in case a day comes when
+   * one does not.
+   */
+  const pending = useRef<Omit<Flight, "id">[]>([]);
 
   const pushToast = useCallback((kind: Toast["kind"], text: string) => {
     const id = ++toastId.current;
@@ -171,22 +187,8 @@ export function useGame(): GameStore {
   }, []);
 
   /**
-   * Hold a card's trip until the table it crosses has caught up.
-   *
-   * A move arrives as two messages - what happened, and then the new state -
-   * and they are separate socket events, so they are separate renders. A
-   * flight drawn on the first of them measures a table that has not moved
-   * yet and reads a discard pile whose top card is still the old one, which
-   * is how a card on its way to the pile came out printed as the card
-   * already lying on it.
-   *
-   * So trips are queued here and let go in `flush`, on the state that
-   * follows. Every path on the server broadcasts state after its events, so
-   * one always does - and `flush` is called on a timer as well, in case a
-   * day comes when one does not.
+   * Let go of the trips `fly` has been holding. See `pending`.
    */
-  const pending = useRef<Omit<Flight, "id">[]>([]);
-
   const flush = useCallback(() => {
     const trips = pending.current;
     if (trips.length === 0) return;
