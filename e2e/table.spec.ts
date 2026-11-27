@@ -89,14 +89,15 @@ test.describe("watching the other players", () => {
     await ana!.page.getByTestId("start-button").click();
     await expect(ana!.page.getByTestId("ready-button")).toBeVisible();
 
-    const seen = waitForClass(bo!.page, "slot-Ana-2", "card--did-peek");
-    await ana!.slot(2).click();
+    // Slot 1 is the bottom row, which is the row a player may study.
+    const seen = waitForClass(bo!.page, "slot-Ana-1", "card--did-peek");
+    await ana!.slot(1).click();
     await seen;
 
     // Bo saw which card was picked up, and is told so in words - but the card
     // itself never turned over on their screen.
     await expect(log(bo!)).toContainText("Ana looks at their own card");
-    await expect(bo!.slotOf("Ana", 2)).not.toHaveClass(/card--up/);
+    await expect(bo!.slotOf("Ana", 1)).not.toHaveClass(/card--up/);
 
     for (const player of players) await player.close();
   });

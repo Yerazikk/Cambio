@@ -52,9 +52,13 @@ function rigMatch(h: Harness, code: string, playerId: string): void {
   }
 }
 
-/** How many cards a player is holding, so a penalty can be told from a discard. */
+/**
+ * How many cards a player is holding, so a penalty can be told from a discard.
+ * A hole a slap left is not one of them - the place stays, the card does not.
+ */
 function handSize(h: Harness, code: string, playerId: string): number {
-  return h.server.manager.getRoom(code)!.state.seats.find((s) => s.id === playerId)!.hand.length;
+  const seat = h.server.manager.getRoom(code)!.state.seats.find((s) => s.id === playerId)!;
+  return seat.hand.filter((id) => id !== null).length;
 }
 
 describe("racing a slap over real sockets", () => {

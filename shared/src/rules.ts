@@ -8,13 +8,28 @@ export const INITIAL_PEEKS = 2;
 /**
  * Whether a slot is one of the cards you may study before the first turn.
  *
- * Hands are laid out two to a row, and the studiable cards are the bottom row -
- * the last `initialPeeks` slots. Fixing them by position rather than letting
- * each player choose is what makes the opening the same deal for everyone, and
- * what lets the table say "your bottom two" and mean something.
+ * A hand is dealt in columns of two - slots 0 and 1 are the first column, 2
+ * and 3 the second - so the bottom row is the odd slots, and at a four-card
+ * hand that is the cards labelled 2 and 4. Fixing them by position rather than
+ * letting each player choose is what makes the opening the same deal for
+ * everyone, and what lets the table say "your bottom two" and mean it: the
+ * player looks at the two cards nearest them, which is where a real hand would
+ * be tipped up.
  */
 export function isInitialPeekSlot(slot: number, handSize: number, initialPeeks: number): boolean {
-  return slot >= handSize - initialPeeks && slot < handSize;
+  if (slot < 0 || slot >= handSize) return false;
+  // Bottom row only, and only the leftmost `initialPeeks` of it.
+  if (slot % 2 !== 1) return false;
+  return (slot - 1) / 2 < initialPeeks;
+}
+
+/** The slots `isInitialPeekSlot` admits, in the order they are laid out. */
+export function initialPeekSlots(handSize: number, initialPeeks: number): number[] {
+  const slots: number[] = [];
+  for (let slot = 0; slot < handSize; slot++) {
+    if (isInitialPeekSlot(slot, handSize, initialPeeks)) slots.push(slot);
+  }
+  return slots;
 }
 /** Table size bounds. */
 export const MIN_PLAYERS = 2;
@@ -70,14 +85,20 @@ export function isCardBack(id: string): boolean {
 export const SLAP_WINDOW_MS = 200;
 
 /**
- * How long the holder of the slap lock has to name a card before the table
- * takes one off them and moves on.
+ * How long the holder of the slap lock has to name a card, or 0 for no clock
+ * at all - which is what this table plays with.
  *
- * Slapping stops the game: everybody waits while the slapper picks. That is
- * the rule, so it needs a clock - and it needs a cost on the far side of it,
- * or pressing SLAP would be a free way to freeze the table.
+ * Slapping stops the game and everybody waits while the slapper picks. A clock
+ * on that is a clock on the one moment in Cambio that is already frantic, and
+ * it was costing people cards for being half a second slow on a gesture they
+ * had already committed to. The table waits instead.
+ *
+ * What stops a stopped table staying stopped for ever is the slapper leaving:
+ * a lock whose holder drops is given up on the spot. That is a disconnection
+ * being handled, not a clock, and it is the only way out of the pause that
+ * does not involve naming a card.
  */
-export const SLAP_PICK_MS = 8_000;
+export const SLAP_PICK_MS = 0;
 
 /**
  * How long a peeked card stays face up on the peeker's screen. Cambio is a
@@ -88,6 +109,18 @@ export const PEEK_MS = 4_000;
 
 /** Per-turn clock. On expiry the server auto-plays a safe move. */
 export const TURN_MS = 45_000;
+
+/**
+ * What each step of a turn puts back on that clock.
+ *
+ * A turn is not one decision, it is a chain of them: draw, then decide what to
+ * do with it, then play out whatever power that fired. Running all of those
+ * off a single budget punishes the turns that have the most to think about,
+ * which are exactly the ones worth thinking about. So every move you actually
+ * make buys you more time - the clock is there to move a seat nobody is
+ * sitting in along, and a player who is plainly playing is not that seat.
+ */
+export const TURN_BONUS_MS = 15_000;
 
 /**
  * Whether a power may be declined.
@@ -122,9 +155,20 @@ export const SLAP_AFTER_CAMBIO = true;
  */
 export const SERVER_REMEMBERS_PEEKS = false;
 
-/** How long a seat is held open for a player who dropped. */
-export const RECONNECT_GRACE_IN_GAME_MS = 60_000;
-export const RECONNECT_GRACE_LOBBY_MS = 10_000;
+/**
+ * How long a seat is held open for a player who dropped.
+ *
+ * In a round it is held to the end of it, full stop - there is no number here
+ * because there is no timer. Losing your seat mid-round is the worst thing
+ * that can happen to you in this game and a flaky connection should not be
+ * able to do it, so the seat waits, the turn order steps over it, and the
+ * player walks back into it whenever they manage to get back. The host can
+ * still remove someone who is plainly gone.
+ *
+ * In the lobby a seat is cheap to give up and cheap to retake, so a dropped
+ * player is cleared after a couple of minutes rather than left as furniture.
+ */
+export const RECONNECT_GRACE_LOBBY_MS = 120_000;
 
 /** Round-trip-time sampling, used to compensate the slap race. */
 export const RTT_PING_INTERVAL_MS = 2_000;
@@ -136,7 +180,12 @@ export const RTT_MAX_COMPENSATION_MS = 150;
 
 /** Room codes omit O/0 and I/1 so they can be read aloud without ambiguity. */
 export const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-export const ROOM_CODE_LENGTH = 6;
+/**
+ * Four characters, from a 32-letter alphabet: a million codes, which is far
+ * more than a table registry that reaps itself will ever hold at once, and two
+ * fewer things to read down a phone than six was.
+ */
+export const ROOM_CODE_LENGTH = 4;
 /** Idle rooms are reaped so the registry cannot grow without bound. */
 export const ROOM_REAP_IDLE_MS = 10 * 60_000;
 
@@ -148,6 +197,7 @@ export type RuleConfig = {
   slapPickMs: number;
   peekMs: number;
   turnMs: number;
+  turnBonusMs: number;
   cambioPenalty: number;
   optionalPowers: boolean;
   slapAfterCambio: boolean;
@@ -162,6 +212,7 @@ export const DEFAULT_RULES: RuleConfig = {
   slapPickMs: SLAP_PICK_MS,
   peekMs: PEEK_MS,
   turnMs: TURN_MS,
+  turnBonusMs: TURN_BONUS_MS,
   cambioPenalty: CAMBIO_PENALTY,
   optionalPowers: OPTIONAL_POWERS,
   slapAfterCambio: SLAP_AFTER_CAMBIO,

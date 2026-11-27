@@ -1,5 +1,13 @@
 import { WebSocket } from "ws";
-import type { Action, ClientMsg, GameView, ServerEvent } from "@cambio/shared";
+import {
+  HAND_SIZE,
+  INITIAL_PEEKS,
+  initialPeekSlots,
+  type Action,
+  type ClientMsg,
+  type GameView,
+  type ServerEvent,
+} from "@cambio/shared";
 import { startServer, type RunningServer, type StartOptions } from "../../src/server.js";
 import { mulberry32 } from "../../src/rng.js";
 
@@ -284,6 +292,17 @@ export async function startGame(clients: TestClient[]): Promise<void> {
 
   host.send({ t: "lobby.start" });
   await Promise.all(clients.map((c) => c.waitForState((v) => v.phase === "study")));
+
+  // Studying the bottom two is now a precondition of being ready, so a
+  // harness that wants to get to the first turn has to do it properly.
+  for (const client of clients) {
+    for (const slot of initialPeekSlots(HAND_SIZE, INITIAL_PEEKS)) client.act({ a: "initialPeek", slot });
+  }
+  await Promise.all(
+    clients.map((c) =>
+      c.waitForState((v) => (v.players.find((p) => p.id === c.playerId)?.peeked.length ?? 0) >= INITIAL_PEEKS),
+    ),
+  );
 
   for (const client of clients) client.act({ a: "readyUp" });
   await Promise.all(clients.map((c) => c.waitForState((v) => v.phase !== "study")));

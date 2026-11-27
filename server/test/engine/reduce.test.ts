@@ -49,21 +49,21 @@ describe("the study phase", () => {
     const state = studying();
     state.seats.forEach((s) => (s.ready = false));
 
-    const result = reduce(state, "ana", { a: "initialPeek", slot: 2 }, ctx);
+    const result = reduce(state, "ana", { a: "initialPeek", slot: 1 }, ctx);
     if (!result.ok) throw new Error(result.message);
 
     const faces = result.out.filter((o) => o.event.t === "card.revealed");
     expect(faces).toHaveLength(1);
     expect(faces[0]?.to).toBe("ana");
     const event = faces[0]?.event;
-    if (event?.t === "card.revealed") expect(event.card.id).toBe("S4");
+    if (event?.t === "card.revealed") expect(event.card.id).toBe("S3");
   });
 
   it("tells the whole table which card was studied, but not what it is", () => {
     const state = studying();
     state.seats.forEach((s) => (s.ready = false));
 
-    const result = reduce(state, "ana", { a: "initialPeek", slot: 2 }, ctx);
+    const result = reduce(state, "ana", { a: "initialPeek", slot: 1 }, ctx);
     if (!result.ok) throw new Error(result.message);
 
     // Everyone sees you pick a card up at a real table; only you see its face.
@@ -74,8 +74,8 @@ describe("the study phase", () => {
     if (event?.t === "table.event") {
       expect(event.kind).toBe("peek");
       expect(event.byId).toBe("ana");
-      expect(event.slots).toEqual([{ ownerId: "ana", slot: 2 }]);
-      expect(JSON.stringify(event)).not.toContain("S4");
+      expect(event.slots).toEqual([{ ownerId: "ana", slot: 1 }]);
+      expect(JSON.stringify(event)).not.toContain("S3");
     }
   });
 
@@ -83,25 +83,29 @@ describe("the study phase", () => {
     let state = studying();
     state.seats.forEach((s) => (s.ready = false));
 
-    state = ok(state, "ana", { a: "initialPeek", slot: 2 });
+    state = ok(state, "ana", { a: "initialPeek", slot: 1 });
     state = ok(state, "ana", { a: "initialPeek", slot: 3 });
-    expect(rejected(state, "ana", { a: "initialPeek", slot: 2 })).toBe("illegalAction");
+    expect(rejected(state, "ana", { a: "initialPeek", slot: 1 })).toBe("illegalAction");
   });
 
+  /*
+   * A hand is dealt in columns of two, so the bottom row is the odd slots -
+   * the cards labelled 2 and 4 on screen, and the two nearest the player.
+   */
   it("only lets you study the bottom row of your hand", () => {
     const state = studying();
     state.seats.forEach((s) => (s.ready = false));
 
     expect(rejected(state, "ana", { a: "initialPeek", slot: 0 })).toBe("badSlot");
-    expect(rejected(state, "ana", { a: "initialPeek", slot: 1 })).toBe("badSlot");
+    expect(rejected(state, "ana", { a: "initialPeek", slot: 2 })).toBe("badSlot");
   });
 
   it("refuses to study the same card twice", () => {
     const state = studying();
     state.seats.forEach((s) => (s.ready = false));
 
-    const once = ok(state, "ana", { a: "initialPeek", slot: 2 });
-    expect(rejected(once, "ana", { a: "initialPeek", slot: 2 })).toBe("illegalAction");
+    const once = ok(state, "ana", { a: "initialPeek", slot: 1 });
+    expect(rejected(once, "ana", { a: "initialPeek", slot: 1 })).toBe("illegalAction");
   });
 
   it("rejects studying a slot that does not exist", () => {
@@ -110,9 +114,28 @@ describe("the study phase", () => {
     expect(rejected(state, "ana", { a: "initialPeek", slot: 9 })).toBe("badSlot");
   });
 
+  /** Looking at the bottom two is the price of being allowed to start. */
+  const studied = (state: ReturnType<typeof studying>, who: string) => {
+    let next = ok(state, who, { a: "initialPeek", slot: 1 });
+    next = ok(next, who, { a: "initialPeek", slot: 3 });
+    return next;
+  };
+
+  it("refuses to call you ready before you have looked at your cards", () => {
+    const state = studying();
+    state.seats.forEach((s) => (s.ready = false));
+
+    expect(rejected(state, "ana", { a: "readyUp" })).toBe("illegalAction");
+
+    const half = ok(state, "ana", { a: "initialPeek", slot: 1 });
+    expect(rejected(half, "ana", { a: "readyUp" })).toBe("illegalAction");
+  });
+
   it("starts play only once every player is ready", () => {
     let state = studying();
     state.seats.forEach((s) => (s.ready = false));
+    state = studied(state, "ana");
+    state = studied(state, "bo");
 
     state = ok(state, "ana", { a: "readyUp" });
     expect(state.phase).toBe("study");
@@ -209,6 +232,54 @@ describe("resolving a drawn card", () => {
   });
 });
 
+/*
+ * A turn is a chain of decisions, not one of them, so each step of it buys
+ * more time. The clock is there to move along a seat nobody is sitting in,
+ * and somebody who is plainly playing is not that seat.
+ */
+describe("the turn clock", () => {
+  const playing = (now: number) =>
+    fixture({
+      hands: { ana: ["S2", "S3", "S4", "S5"], bo: ["C2", "C3", "C4", "C5"] },
+      discard: ["D2"],
+      deck: ["H4", "S7"],
+      turnEndsAt: now + 20_000,
+    });
+
+  it("adds to what is left rather than setting a floor under it", () => {
+    const state = ok(playing(ctx.now), "ana", { a: "drawDeck" });
+    expect(state.turnEndsAt).toBe(ctx.now + 20_000 + state.rules.turnBonusMs);
+  });
+
+  it("pays again for each step, so a turn with a power in it is not rushed", () => {
+    let state = ok(playing(ctx.now), "ana", { a: "drawDeck" });
+    const afterDraw = state.turnEndsAt;
+
+    // Discarding a seven fires its power, which is a second decision.
+    state = ok(state, "ana", { a: "discardDrawn" });
+    expect(state.phase).toBe("powerPeekOwn");
+    expect(state.turnEndsAt).toBe(afterDraw! + state.rules.turnBonusMs);
+  });
+
+  it("starts the next player's turn on a fresh clock, not an inherited one", () => {
+    let state = ok(playing(ctx.now), "ana", { a: "drawDeck" });
+    state = ok(state, "ana", { a: "swapWithSlot", slot: 0 });
+
+    expect(state.seats[state.turnIndex]?.id).toBe("bo");
+    expect(state.turnEndsAt).toBe(ctx.now + state.rules.turnMs);
+  });
+
+  it("leaves an untimed table untimed", () => {
+    const untimed = fixture({
+      hands: { ana: ["S2", "S3"], bo: ["C2", "C3"] },
+      discard: ["D2"],
+      deck: ["S7"],
+      turnEndsAt: null,
+    });
+    expect(ok(untimed, "ana", { a: "drawDeck" }).turnEndsAt).toBeNull();
+  });
+});
+
 describe("powers", () => {
   /** Draw `card` from the deck and discard it, so its power triggers. */
   function trigger(card: string, hands?: Record<PlayerId, string[]>) {
@@ -231,15 +302,30 @@ describe("powers", () => {
     return ok(ok(state, "ana", { a: "drawDeck" }), "ana", { a: "discardDrawn" });
   }
 
+  /** Name the two cards a king looks at: one of Ana's, one of Bo's. */
+  function kingPicks(state: ReturnType<typeof trigger>) {
+    const once = ok(state, "ana", { a: "kingPick", playerId: "ana", slot: 0 });
+    return ok(once, "ana", { a: "kingPick", playerId: "bo", slot: 0 });
+  }
+
   describe("using one is not a choice", () => {
     it("refuses to let a power be declined", () => {
       expect(rejected(trigger("S7"), "ana", { a: "forfeitPower" })).toBe("illegalAction");
       expect(rejected(trigger("S12"), "ana", { a: "forfeitPower" })).toBe("illegalAction");
     });
 
-    it("refuses to let a king look and then keep both cards", () => {
-      const peeked = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
-      expect(rejected(peeked, "ana", { a: "kingSkip" })).toBe("illegalAction");
+    /*
+     * A king is the exception, and deliberately. Its power is a look at two
+     * cards and the right to decide about them - so keeping both is one of
+     * the two answers the power asks for, not a way of ducking it, and it is
+     * legal even where the host has made powers compulsory.
+     */
+    it("still lets a king keep both cards, because deciding is the power", () => {
+      const picked = kingPicks(trigger("S13"));
+      const state = ok(picked, "ana", { a: "kingSkip" });
+
+      expect(state.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
+      expect(state.phase).toBe("awaitingAction");
     });
 
     it("lets the turn clock walk away from one, because a clock is not a player", () => {
@@ -424,74 +510,97 @@ describe("powers", () => {
     });
   });
 
-  describe("king: look, then choose", () => {
-    it("enters the king phase", () => {
+  describe("king: look at two, then choose", () => {
+    it("enters the king phase with nothing named yet", () => {
       const state = trigger("S13");
       expect(state.phase).toBe("powerKing");
-      expect(state.kingPeeked).toBe(false);
+      expect(state.kingPicks).toEqual([]);
     });
 
-    it("does not end the turn on the peek - the choice still remains", () => {
-      const state = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
+    it("shows nothing on the first pick - the two go up together or not at all", () => {
+      const result = reduce(trigger("S13"), "ana", { a: "kingPick", playerId: "bo", slot: 0 }, ctx);
+      if (!result.ok) throw new Error(result.message);
 
-      expect(state.phase).toBe("powerKing");
-      expect(state.kingPeeked).toBe(true);
-      expect(state.turnIndex).toBe(0);
+      expect(result.state.phase).toBe("powerKing");
+      expect(result.state.kingPicks).toEqual([{ ownerId: "bo", slot: 0 }]);
+      expect(result.out.filter((o) => o.event.t === "card.revealed")).toHaveLength(0);
     });
 
-    it("may look at your own card, unlike a nine or ten", () => {
-      const state = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "ana", slot: 0 });
-      expect(state.kingPeeked).toBe(true);
+    it("turns both faces up at once, to the king alone, on the second pick", () => {
+      const once = ok(trigger("S13"), "ana", { a: "kingPick", playerId: "bo", slot: 0 });
+      const result = reduce(once, "ana", { a: "kingPick", playerId: "ana", slot: 1 }, ctx);
+      if (!result.ok) throw new Error(result.message);
+
+      const faces = result.out.filter((o) => o.event.t === "card.revealed");
+      expect(faces).toHaveLength(2);
+      expect(faces.every((f) => f.to === "ana")).toBe(true);
+      expect(faces.map((f) => (f.event.t === "card.revealed" ? f.event.card.id : null))).toEqual(["C2", "S3"]);
+      expect(result.state.phase).toBe("powerKingChoice");
     });
 
-    it("swaps one of yours for one of theirs after looking", () => {
-      let state = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
-      state = ok(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 1, bId: "bo", bSlot: 0 });
+    it("tells the table which cards were named, but never what they are", () => {
+      const once = ok(trigger("S13"), "ana", { a: "kingPick", playerId: "bo", slot: 0 });
+      const result = reduce(once, "ana", { a: "kingPick", playerId: "ana", slot: 1 }, ctx);
+      if (!result.ok) throw new Error(result.message);
 
-      expect(state.seats[0]?.hand).toEqual(["S2", "C2", "S4", "S5"]);
-      expect(state.seats[1]?.hand).toEqual(["S3", "C3", "C4", "C5"]);
-      expect(state.phase).toBe("awaitingAction");
+      const announced = result.out.filter((o) => o.event.t === "table.event");
+      expect(announced).toHaveLength(1);
+      expect(announced[0]?.to).toBe("all");
+      expect(JSON.stringify(announced)).not.toContain("C2");
+      expect(JSON.stringify(announced)).not.toContain("S3");
     });
 
-    it("swaps any two cards after looking, not just one of yours for one of theirs", () => {
-      const peeked = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
-
-      // Two of your own.
-      const mine = ok(peeked, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "ana", bSlot: 3 });
-      expect(mine.seats[0]?.hand).toEqual(["S5", "S3", "S4", "S2"]);
-
-      // Two that are not yours at all.
-      const theirs = ok(peeked, "ana", { a: "freeSwap", aId: "bo", aSlot: 0, bId: "cy", bSlot: 1 });
-      expect(theirs.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
-      expect(theirs.seats[1]?.hand).toEqual(["D7", "C3", "C4", "C5"]);
-      expect(theirs.seats[2]?.hand).toEqual(["D6", "C2"]);
+    it("may name your own cards, unlike a nine or ten", () => {
+      let state = ok(trigger("S13"), "ana", { a: "kingPick", playerId: "ana", slot: 0 });
+      state = ok(state, "ana", { a: "kingPick", playerId: "ana", slot: 3 });
+      expect(state.phase).toBe("powerKingChoice");
     });
 
-    it("refuses to swap a card with itself", () => {
-      const state = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
-      expect(rejected(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "ana", bSlot: 0 })).toBe("badTarget");
-    });
+    it("swaps the two it looked at", () => {
+      const state = ok(kingPicks(trigger("S13")), "ana", { a: "kingSwap" });
 
-    it("passes after looking, leaving hands untouched, where the host allows it", () => {
-      const peeked = ok(triggerOptional("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
-      const state = ok(peeked, "ana", { a: "kingSkip" });
-
-      expect(state.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
+      expect(state.seats[0]?.hand).toEqual(["C2", "S3", "S4", "S5"]);
+      expect(state.seats[1]?.hand).toEqual(["S2", "C3", "C4", "C5"]);
       expect(state.phase).toBe("awaitingAction");
       expect(state.turnIndex).toBe(1);
     });
 
-    it("insists you look before you swap or pass", () => {
-      const state = triggerOptional("S13");
-      expect(rejected(state, "ana", { a: "freeSwap", aId: "ana", aSlot: 0, bId: "bo", bSlot: 0 })).toBe(
-        "illegalAction",
-      );
-      expect(rejected(state, "ana", { a: "kingSkip" })).toBe("illegalAction");
+    it("swaps two that are not yours at all", () => {
+      let state = ok(trigger("S13"), "ana", { a: "kingPick", playerId: "bo", slot: 0 });
+      state = ok(state, "ana", { a: "kingPick", playerId: "cy", slot: 1 });
+      state = ok(state, "ana", { a: "kingSwap" });
+
+      expect(state.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
+      expect(state.seats[1]?.hand).toEqual(["D7", "C3", "C4", "C5"]);
+      expect(state.seats[2]?.hand).toEqual(["D6", "C2"]);
     });
 
-    it("allows only one look", () => {
-      const state = ok(trigger("S13"), "ana", { a: "peekOther", playerId: "bo", slot: 0 });
-      expect(rejected(state, "ana", { a: "peekOther", playerId: "bo", slot: 1 })).toBe("illegalAction");
+    it("keeps both where they are", () => {
+      const state = ok(kingPicks(trigger("S13")), "ana", { a: "kingSkip" });
+
+      expect(state.seats[0]?.hand).toEqual(["S2", "S3", "S4", "S5"]);
+      expect(state.seats[1]?.hand).toEqual(["C2", "C3", "C4", "C5"]);
+      expect(state.phase).toBe("awaitingAction");
+      expect(state.turnIndex).toBe(1);
+    });
+
+    it("refuses to name the same card twice", () => {
+      const once = ok(trigger("S13"), "ana", { a: "kingPick", playerId: "bo", slot: 0 });
+      expect(rejected(once, "ana", { a: "kingPick", playerId: "bo", slot: 0 })).toBe("badTarget");
+    });
+
+    it("insists on two cards before it will answer either way", () => {
+      const state = trigger("S13");
+      expect(rejected(state, "ana", { a: "kingSwap" })).toBe("illegalAction");
+      expect(rejected(state, "ana", { a: "kingSkip" })).toBe("illegalAction");
+
+      const once = ok(state, "ana", { a: "kingPick", playerId: "bo", slot: 0 });
+      expect(rejected(once, "ana", { a: "kingSwap" })).toBe("illegalAction");
+    });
+
+    it("names two and no more", () => {
+      const picked = kingPicks(trigger("S13"));
+      expect(rejected(picked, "ana", { a: "kingPick", playerId: "cy", slot: 0 })).toBe("illegalAction");
     });
   });
 

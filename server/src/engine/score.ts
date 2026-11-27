@@ -1,9 +1,11 @@
 import type { Card, CardId, PlayerId } from "@cambio/shared";
 import type { GameState } from "./state.js";
 
-export function handScore(hand: readonly CardId[], cards: ReadonlyMap<CardId, Card>): number {
+/** A hand's points. Holes - places a card has left - are worth nothing. */
+export function handScore(hand: readonly (CardId | null)[], cards: ReadonlyMap<CardId, Card>): number {
   let total = 0;
   for (const id of hand) {
+    if (id === null) continue;
     const card = cards.get(id);
     if (card !== undefined) total += card.points;
   }

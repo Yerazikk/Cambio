@@ -4,8 +4,8 @@ import {
   MAX_DECKS,
   MAX_PLAYERS,
   MIN_DECKS,
+  initialPeekSlots,
   MIN_PLAYERS,
-  RECONNECT_GRACE_IN_GAME_MS,
   RECONNECT_GRACE_LOBBY_MS,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
@@ -18,7 +18,7 @@ import {
   type RuleConfig,
 } from "@cambio/shared";
 import { reduce, slapLanded, type Outbound, type ReduceCtx } from "./engine/reduce.js";
-import { addSeat, emptyState, startRound } from "./engine/setup.js";
+import { addSeat, emptyState, returnToLobby, startRound } from "./engine/setup.js";
 import {
   isLocked,
   lockHolder,
@@ -62,8 +62,11 @@ export type RoomManagerOptions = {
   newId?: () => string;
   scheduler?: Scheduler;
   rules?: Partial<RuleConfig>;
-  /** Override how long a dropped player's seat is held. Tests shorten this. */
-  graceMs?: { inGame?: number; lobby?: number };
+  /**
+   * Override how long a dropped player's lobby seat is held. Tests shorten it.
+   * There is no in-game equivalent: a seat in a round is held to the end of it.
+   */
+  graceMs?: { lobby?: number };
   /**
    * Output produced by a timer rather than by a client message: a settled slap
    * race, an expired grace period, a turn that ran out of clock.
@@ -179,16 +182,29 @@ export class RoomManager {
     return { ok: true, code, playerId, token };
   }
 
+  /**
+   * Sit down at a table, or get back into one.
+   *
+   * The code and the name together are enough to reclaim a seat: a player who
+   * dropped mid-round, cleared their storage, or came back on a different
+   * device has no token left, and the alternative to letting the name back in
+   * is telling them their game is gone. A seat somebody is still sitting in is
+   * never handed over, so this cannot be used to steal one.
+   */
   joinRoom(code: RoomCode, name: string): Result<{ code: RoomCode; playerId: PlayerId; token: string }> {
     const room = this.rooms.get(code.toUpperCase());
     if (!room) return err("roomNotFound", `no room with the code ${code}`);
-    if (room.state.phase !== "lobby") return err("gameAlreadyStarted", "that game is already under way");
-    if (room.state.seats.length >= MAX_PLAYERS) return err("roomFull", `that table is full (${MAX_PLAYERS} players)`);
 
     const wanted = cleanName(name, "player");
-    if (room.state.seats.some((s) => s.name.toLowerCase() === wanted.toLowerCase())) {
-      return err("nameTaken", `someone at that table is already called ${wanted}`);
+    const sameName = room.state.seats.find((s) => s.name.toLowerCase() === wanted.toLowerCase());
+
+    if (sameName !== undefined) {
+      if (sameName.connected) return err("nameTaken", `someone at that table is already called ${wanted}`);
+      return this.reclaim(room, sameName.id);
     }
+
+    if (room.state.phase !== "lobby") return err("gameAlreadyStarted", "that game is already under way");
+    if (room.state.seats.length >= MAX_PLAYERS) return err("roomFull", `that table is full (${MAX_PLAYERS} players)`);
 
     const playerId = this.nextId();
     const token = this.nextId();
@@ -196,6 +212,27 @@ export class RoomManager {
     room.lastActivityAt = this.opts.now();
     this.sessions.set(token, { token, playerId, code: room.code });
 
+    return { ok: true, code: room.code, playerId, token };
+  }
+
+  /**
+   * Hand an empty seat back to the player it belongs to, with a fresh token.
+   *
+   * Every token the seat had before is dropped: they are no use to whoever
+   * held them, and leaving them live would let a stale tab answer for a player
+   * who has already come back somewhere else.
+   */
+  private reclaim(room: Room, playerId: PlayerId): Ok<{ code: RoomCode; playerId: PlayerId; token: string }> {
+    this.cancelGrace(room, playerId);
+    this.revokeSessionsFor(playerId);
+
+    const seat = seatOf(room.state, playerId);
+    if (seat) seat.connected = true;
+    room.state.version += 1;
+    room.lastActivityAt = this.opts.now();
+
+    const token = this.nextId();
+    this.sessions.set(token, { token, playerId, code: room.code });
     return { ok: true, code: room.code, playerId, token };
   }
 
@@ -222,8 +259,18 @@ export class RoomManager {
   }
 
   /**
-   * Mark a player as dropped and start their grace period. The seat is held so
-   * a refresh does not cost them the game.
+   * Mark a player as dropped. The seat is held so a dropped connection does
+   * not cost them the game.
+   *
+   * In a round it is held with no timer at all: turn order steps over an empty
+   * seat, slapping is not open to one, and the player walks back into it
+   * whenever they manage to get back - by token if they still have one, by
+   * name if they do not. Losing a round to a flaky connection is the worst
+   * thing this game can do to someone, so it does not do it, and the host can
+   * still remove anyone who is plainly not coming back.
+   *
+   * In the lobby a seat is cheap to retake, so a dropped one is cleared after
+   * a couple of minutes rather than left as furniture.
    */
   disconnect(code: RoomCode, playerId: PlayerId): void {
     const room = this.rooms.get(code);
@@ -235,16 +282,40 @@ export class RoomManager {
     room.state.version += 1;
     room.rtt.forget(playerId);
     room.lastActivityAt = this.opts.now();
-
-    const graceMs =
-      room.state.phase === "lobby"
-        ? (this.opts.graceMs?.lobby ?? RECONNECT_GRACE_LOBBY_MS)
-        : (this.opts.graceMs?.inGame ?? RECONNECT_GRACE_IN_GAME_MS);
     this.cancelGrace(room, playerId);
+
+    /*
+     * The one thing a dropped player must not do is leave the table stopped.
+     * With no clock on naming a card, a slapper who vanishes mid-slap would
+     * hold the game up for the rest of the round, so their place in the queue
+     * goes with them.
+     */
+    this.dropFromSlapQueue(room, playerId);
+
+    if (room.state.phase !== "lobby") return;
+
+    const graceMs = this.opts.graceMs?.lobby ?? RECONNECT_GRACE_LOBBY_MS;
     room.graceHandles.set(
       playerId,
       this.scheduler.setTimeout(() => this.vacateSeat(code, playerId), graceMs),
     );
+  }
+
+  /**
+   * Take a player out of the slap queue, and let the table go if they were
+   * the one it was waiting on.
+   */
+  private dropFromSlapQueue(room: Room, playerId: PlayerId): void {
+    const lock = room.state.slapLock;
+    if (lock === null) return;
+    const before = lock.queue.length;
+    lock.queue = lock.queue.filter((entry) => entry.playerId !== playerId);
+    if (lock.queue.length === before) return;
+
+    room.state.version += 1;
+    const out: Outbound[] = [];
+    this.pumpLock(room, out);
+    this.emitAsync(room.code, out);
   }
 
   /** Give up a seat for good, once its grace period has run out. */
@@ -299,10 +370,23 @@ export class RoomManager {
     }
   }
 
-  /** Leave voluntarily: the seat goes immediately, with no grace period. */
+/**
+   * Leave voluntarily.
+   *
+   * From the lobby the seat goes at once - there is nothing to come back to.
+   * Mid-round it is held exactly like a dropped connection, because the two
+   * are indistinguishable from the inside: closing the tab, losing signal and
+   * hitting Leave by mistake all look the same an hour later, and only one of
+   * them should cost somebody their round. The seat can be walked back into
+   * with the same name, and the host can clear it.
+   */
   leave(code: RoomCode, playerId: PlayerId): void {
     const room = this.rooms.get(code);
     if (!room) return;
+    if (room.state.phase !== "lobby") {
+      this.disconnect(code, playerId);
+      return;
+    }
     this.cancelGrace(room, playerId);
     this.removeSeat(room, playerId);
     this.revokeSessionsFor(playerId);
@@ -393,22 +477,32 @@ export class RoomManager {
   }
 
   /**
-   * Play another round at the same table. Keeps everyone in their seat, so a
-   * group can keep playing without swapping room codes.
+   * Play again: take the whole table back to its lobby.
+   *
+   * Not straight into a fresh deal. Between rounds is when a table changes its
+   * mind - another pack, a different back, somebody joining or going - and
+   * dealing immediately gave nobody the chance. The lobby is also where a
+   * player who dropped in the last round is picked up again.
+   *
+   * Any player may do it rather than the host alone. The round is over, so
+   * there is nothing left to disrupt, and a table whose host has wandered off
+   * should not be stuck staring at a scoreboard.
    */
   restart(code: RoomCode, byPlayerId: PlayerId): Result<{ out: Outbound[] }> {
     const room = this.rooms.get(code);
     if (!room) return err("roomNotFound", "that room no longer exists");
-    if (room.state.hostId !== byPlayerId) return err("notHost", "only the host can start another round");
+    if (!seatOf(room.state, byPlayerId)) return err("sessionInvalid", "you are not seated at this table");
     if (room.state.phase !== "finished") return err("illegalAction", "finish this round first");
-    if (room.state.seats.length < MIN_PLAYERS) {
-      return err("notEnoughPlayers", `you need at least ${MIN_PLAYERS} players`);
-    }
 
     room.arbiter.cancel();
     this.clearLockClock(room);
     this.margins.delete(room.code);
-    room.state = startRound(room.state, this.opts.rng);
+    room.state = returnToLobby(room.state);
+    // A seat held open through the round is only held for that round. Back in
+    // the lobby it is an ordinary empty chair, on the ordinary lobby clock.
+    for (const seat of room.state.seats) {
+      if (!seat.connected) this.disconnect(code, seat.id);
+    }
     room.lastActivityAt = this.opts.now();
     return { ok: true, out: [] };
   }
@@ -640,6 +734,8 @@ export class RoomManager {
           targetId: spared.targetId ?? spared.playerId,
           slot: spared.slot ?? 0,
           outcome: "lostRace",
+          // Nothing was turned over, so there is no card to show.
+          card: null,
           endedById,
           marginMs: this.marginFor(room.code, spared.playerId, false),
         },
@@ -667,7 +763,13 @@ export class RoomManager {
     }
   }
 
-  /** The holder's time to name a card. Running out of it costs them one. */
+/**
+   * The holder's time to name a card, where a table has any.
+   *
+   * This one does not: `slapPickMs` is 0, so the table simply waits. What
+   * keeps it from waiting for ever is the holder dropping, which gives up
+   * their place in the queue - see `disconnect`.
+   */
   private armLockClock(room: Room): void {
     this.clearLockClock(room);
     const lock = room.state.slapLock;
@@ -788,8 +890,16 @@ export class RoomManager {
 /** The least damaging legal move for the current phase. */
 function autoPlay(state: GameState): EngineAction | null {
   switch (state.phase) {
-    case "study":
-      return { a: "readyUp" };
+    case "study": {
+      // Ready now needs the two cards actually looked at, so the clock has to
+      // look at them on the player's behalf before it can call them ready.
+      const seat = state.seats.find((s) => !s.ready);
+      if (seat === undefined) return { a: "readyUp" };
+      const unstudied = initialPeekSlots(seat.hand.length, state.rules.initialPeeks).find(
+        (slot) => !seat.initialPeeked.includes(slot),
+      );
+      return unstudied === undefined ? { a: "readyUp" } : { a: "initialPeek", slot: unstudied };
+    }
     case "awaitingAction":
       return { a: "drawDeck" };
     case "holdingCard":
@@ -802,11 +912,23 @@ function autoPlay(state: GameState): EngineAction | null {
       // Not `forfeitPower`: at a table where powers are compulsory no player
       // may decline one, and the clock is not a player.
       return { a: "powerTimeout" };
+    case "powerKingChoice":
+      // The king has already had its look. Leaving both cards where they are
+      // is the move that changes nobody's hand.
+      return { a: "kingSkip" };
     case "slapGiveCard":
-      return { a: "slapGive", slot: 0 };
+      return { a: "slapGive", slot: firstHeldSlot(state) };
     default:
       return null;
   }
+}
+
+/** The first slot the card-payer still has a card in. Holes are not payable. */
+function firstHeldSlot(state: GameState): number {
+  const seat = state.slapGiveFor === null ? undefined : seatOf(state, state.slapGiveFor.slapperId);
+  if (seat === undefined) return 0;
+  const index = seat.hand.findIndex((id) => id !== null);
+  return index === -1 ? 0 : index;
 }
 
 function cleanName(raw: string, fallback: string): string {

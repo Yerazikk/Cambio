@@ -70,6 +70,7 @@ export function Game({ game }: { game: GameStore }): React.JSX.Element {
           me={me}
           slapArmed={game.slapArmed}
           slapPending={game.slapPending}
+          slapPulse={game.slapPulse}
           keysHeld={helpOpen}
           dealing={game.dealing}
           pick={game.pick}

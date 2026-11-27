@@ -1,6 +1,5 @@
 import type { Card, PlayerId } from "@cambio/shared";
 import { CardFace, type Flash } from "./Card.js";
-import { Crowned } from "./Crown.js";
 import { handPlace, type Placement } from "../seating.js";
 
 export type SeatProps = {
@@ -77,8 +76,14 @@ export function Seat({
   return (
     <section className={classes.join(" ")} style={style} data-testid={`seat-${player.name}`} aria-label={`${player.name}'s hand`}>
       <header className="seat__head">
+        {/*
+          No crown here, unlike the lobby. Who set the table up stops being
+          worth knowing the moment it is dealt: in a round the host is just
+          another player, and a mark on one name is one more thing to read
+          past at every seat.
+        */}
         <span className="seat__name">
-          <Crowned name={player.name} isHost={player.isHost} />
+          {player.name}
           {isYou && <span className="chip chip--quiet">you</span>}
         </span>
         <span className="seat__meta">
@@ -101,18 +106,39 @@ export function Seat({
           {player.slots.map((slot, index) => {
             // A slot shows a face from one of two sources: the authoritative
             // view at the final reveal, or a peek we are being shown now.
-            const face: Card | null = slot.known ? slot.card : revealFor(player.id, index);
+            const peek = revealFor(player.id, index);
+            const face: Card | null = slot.kind === "up" ? slot.card : peek;
+
+            /*
+             * A hole in a hand is drawn rather than skipped: the place a card
+             * used to be is information, and leaving it blank is what stops
+             * the three cards beside it from sliding into new positions the
+             * player has not memorised. It still turns a face up for the
+             * moment a slap reveals what left it.
+             */
+            if (slot.kind === "gap" && peek === null) {
+              return (
+                <span
+                  key={`gap-${index}`}
+                  className="card card--hole"
+                  data-testid={`hole-${player.name}-${index}`}
+                  aria-label="an empty place in the hand"
+                  style={{ "--slot-i": index, "--col": handPlace(index).col, "--row": handPlace(index).row } as React.CSSProperties}
+                />
+              );
+            }
+
             return (
               <CardFace
-                key={slot.id}
+                key={slot.kind === "gap" ? `gap-${index}` : slot.id}
                 card={face}
-                state={targetable(index)}
+                state={slot.kind === "gap" ? "idle" : targetable(index)}
                 flash={flashFor(player.id, index)}
                 onClick={() => onSlot(index)}
                 testId={`slot-${player.name}-${index}`}
                 dealIndex={index}
                 place={handPlace(index)}
-                {...(isYou ? { label: String(index + 1) } : {})}
+                {...(isYou && slot.kind !== "gap" ? { label: String(index + 1) } : {})}
               />
             );
           })}

@@ -434,6 +434,37 @@ kbd {
   transition: transform 200ms var(--ease-out);
   -webkit-tap-highlight-color: transparent;
 }
+/*
+ * A hole: the place a card used to be.
+ *
+ * Drawn rather than left blank, because the gap is the information - it says
+ * a card was slapped out of this hand, and from where - and because the three
+ * cards beside it have to stay exactly where their owner memorised them. It
+ * is the outline of a card and nothing else: no face, no back, no shadow,
+ * since there is nothing lying there to throw one.
+ */
+.card--hole {
+  position: absolute;
+  width: var(--card-w, 52px);
+  height: var(--card-h, 74px);
+  border-radius: max(3px, calc(var(--card-w, 52px) * 0.09));
+  border: 1.5px dashed var(--line-strong);
+  background: color-mix(in srgb, var(--tint-ink) 4%, transparent);
+  pointer-events: none;
+  /*
+   * Faded in, because a hole usually appears where a slapped card has just
+   * finished being shown to the table. Cutting straight from that face to a
+   * dashed outline reads as a glitch; a beat of nothing reads as the card
+   * having gone.
+   */
+  animation: hole-in 420ms var(--ease-out);
+}
+@keyframes hole-in {
+  from {
+    opacity: 0;
+  }
+}
+
 .card--small {
   width: calc(var(--card-w, 52px) * 0.77);
   height: calc(var(--card-h, 74px) * 0.77);
@@ -560,6 +591,28 @@ kbd {
   transition: border-color 180ms var(--ease-io);
   pointer-events: none;
   z-index: 2;
+}
+
+/*
+ * The ring on a card that has just been played is a different thing from the
+ * ring on one you could click, and it is drawn like one: set further out,
+ * three times the weight, and with the card's own colour thrown behind it so
+ * it reads from across the table rather than only from the seat it happened
+ * at. This is the whole report of another player's move - everything else
+ * about it is face down - so it is worth the ink.
+ */
+.card--did-peek::after,
+.card--did-swap::after,
+.card--did-replace::after,
+.card--did-give::after,
+.card--did-penalty::after,
+.card--did-slap::after {
+  inset: calc(var(--card-w, 52px) * -0.14);
+  border-radius: calc(var(--card-r) + var(--card-w, 52px) * 0.14);
+  border-width: 4px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ring) 25%, transparent),
+    0 0 calc(var(--card-w, 52px) * 0.5) color-mix(in srgb, var(--ring) 45%, transparent);
 }
 
 .card--targetable,
@@ -785,6 +838,18 @@ kbd {
  * touch, and shrinking them any further would cost more in legibility than
  * the spacing is worth.
  */
+/*
+ * Two players, and the ring is mostly empty table. There is nothing for the
+ * cards to clear and nobody's hand to crowd, so they take the room: a
+ * head-to-head game is read at arm's length, not squinted at.
+ */
+.table[data-players="2"] {
+  --card-base: clamp(44px, min(6.4vw, 9vh), 94px);
+}
+.table[data-players="3"],
+.table[data-players="4"] {
+  --card-base: clamp(34px, min(4.8vw, 6.8vh), 66px);
+}
 .table[data-players="5"],
 .table[data-players="6"] {
   --card-base: clamp(26px, min(3.3vw, 4.8vh), 46px);
@@ -907,6 +972,39 @@ kbd {
   inset: clamp(8px, 2.2%, 20px);
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/*
+ * A slap, said by the table rather than by a card.
+ *
+ * Slapping is the one move that is not a thing one player does to one card -
+ * it stops the whole game - so the whole surface answers for it. The rim
+ * takes a couple of beats of ember and fades out; it is deliberately a pulse
+ * and not a state, because by the time it has finished the table has usually
+ * started again.
+ */
+.table[data-slapped] .felt__surface {
+  animation: felt-slapped 900ms var(--ease-out) 2;
+}
+@keyframes felt-slapped {
+  0%,
+  100% {
+    box-shadow: var(--gl-sheet-edge);
+  }
+  35% {
+    box-shadow:
+      var(--gl-sheet-edge),
+      0 0 0 3px color-mix(in srgb, var(--needs) 55%, transparent),
+      0 0 34px 6px color-mix(in srgb, var(--needs) 30%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table[data-slapped] .felt__surface {
+    animation: none;
+    box-shadow:
+      var(--gl-sheet-edge),
+      0 0 0 3px color-mix(in srgb, var(--needs) 45%, transparent);
+  }
 }
 
 .felt__middle {

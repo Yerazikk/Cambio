@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { knows, learn, slapOpen, viewFor } from "../../src/engine/state.js";
-import { fixture, slotFaces } from "../helpers.js";
+import { addSeat, emptyState, startRound } from "../../src/engine/setup.js";
+import { mulberry32 } from "../../src/rng.js";
+import { fixture, slotFaces, slotKinds } from "../helpers.js";
 
 describe("view redaction", () => {
   it("hides every hand from every viewer during play", () => {
@@ -16,11 +18,49 @@ describe("view redaction", () => {
     }
   });
 
-  it("still reports hand sizes and card ids so the table can be drawn", () => {
+  it("still reports hand sizes so the table can be drawn", () => {
     const state = fixture({ hands: { ana: ["S7", "H13", "C3"], bo: ["D9"] } });
     const view = viewFor(state, "bo");
     expect(view.players.find((p) => p.id === "ana")?.slots).toHaveLength(3);
     expect(view.players.find((p) => p.id === "bo")?.slots).toHaveLength(1);
+  });
+
+  /**
+   * The names cards are sent under must not be the names they are kept under.
+   *
+   * Internally a card is called `S7` or `H13`, which says outright what it is,
+   * and a slot goes to every player at the table - so sending the real id
+   * would hand the whole table's hands to anybody who opened a console, with
+   * every face still dutifully redacted. This is that bug, kept shut.
+   */
+  it("names a slot by a handle that gives the card away to nobody", () => {
+    const rng = mulberry32(7);
+    let state = emptyState("TEST", "ana");
+    state = addSeat(state, { id: "ana", name: "Ana" });
+    state = addSeat(state, { id: "bo", name: "Bo" });
+    state = startRound(state, rng);
+
+    const payload = JSON.stringify(viewFor(state, "ana"));
+    // Every card anybody is holding. The discard top is not among them: it is
+    // face up on the table, so its real id travelling with it gives away
+    // nothing that is not already lying there for everyone to read.
+    const inHands = state.seats.flatMap((seat) => seat.hand);
+    expect(inHands.length).toBeGreaterThan(0);
+    for (const id of inHands) {
+      expect(payload, `the view leaked the real id ${id}`).not.toContain(`"${id}"`);
+    }
+
+    for (const player of viewFor(state, "ana").players) {
+      for (const slot of player.slots) {
+        if (slot.kind !== "gap") expect(slot.id).toMatch(/^c\d+$/);
+      }
+    }
+  });
+
+  /** A hole is sent as a hole: a place, with no card and no handle. */
+  it("sends a slapped-out slot as a gap rather than closing the hand up", () => {
+    const state = fixture({ hands: { ana: ["S7", null, "C3"], bo: ["D9"] } });
+    expect(slotKinds(viewFor(state, "bo"), "ana")).toEqual(["down", "gap", "down"]);
   });
 
   it("reveals every hand once the round is finished", () => {

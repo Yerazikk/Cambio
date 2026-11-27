@@ -14,6 +14,8 @@ export type TableProps = {
   me: PlayerId;
   slapArmed: boolean;
   slapPending: boolean;
+  /** True while the table is still flashing red from a slap that landed. */
+  slapPulse: boolean;
   /** True while something is covering the table - the rule book - so its keys stand down. */
   keysHeld: boolean;
   /** Set while a fresh hand is on its way out to the seats. */
@@ -34,13 +36,15 @@ export type TableProps = {
 type SlotState = "idle" | "targetable" | "selected" | "slap";
 
 export function Table(props: TableProps): React.JSX.Element {
-  const { view, me, slapArmed, slapPending, keysHeld, dealing, pick, log, act, slap, claimSlap, setPick } = props;
+  const { view, me, slapArmed, slapPending, slapPulse, keysHeld, dealing, pick, log, act, slap, claimSlap, setPick } = props;
   const { revealFor, flashFor, pileFlash, onLeave } = props;
 
   const myTurn = view.turnPlayerId === me;
   const mySeat = view.players.find((p) => p.id === me);
   const ownSlots = mySeat?.slots.length ?? 0;
   const iOweACard = view.slapDebt?.slapperId === me;
+  /** You cannot call yourself ready before you know what you are holding. */
+  const studied = (mySeat?.peeked.length ?? 0) >= INITIAL_PEEKS;
 
   /*
    * A slap stops the table. Whoever holds the lock owes it a card and nothing
@@ -94,6 +98,13 @@ export function Table(props: TableProps): React.JSX.Element {
     const mine = ownerId === me;
 
     if (pick !== null && pick.ownerId === ownerId && pick.slot === slot) return "selected";
+    // A king's picks are recorded server-side, so they survive a refresh and
+    // light up on everyone's screen rather than only on the king's.
+    if (view.kingPicks.some((p) => p.ownerId === ownerId && p.slot === slot)) return "selected";
+
+    // A hole is not a card, so nothing can be done to it.
+    const here = view.players.find((p) => p.id === ownerId)?.slots[slot];
+    if (here === undefined || here.kind === "gap") return "idle";
 
     if (view.phase === "study") {
       if (!mine || mySeat === undefined || mySeat.ready) return "idle";
@@ -114,8 +125,11 @@ export function Table(props: TableProps): React.JSX.Element {
       // Every swapping power takes any two cards on the table, so every card
       // is live at every step of them.
       case "powerFreeSwap":
-      case "powerKing":
         return "targetable";
+      // A king is naming the two cards it will look at. Once it has both, the
+      // table goes quiet and the choice moves to the buttons.
+      case "powerKing":
+        return view.kingPicks.length < 2 ? "targetable" : "idle";
       default:
         return "idle";
     }
@@ -166,9 +180,9 @@ export function Table(props: TableProps): React.JSX.Element {
         chooseForSwap(ownerId, slot);
         return;
       case "powerKing":
-        // The look comes first; after that a king swaps like a jack or queen.
-        if (!view.kingPeeked) act({ a: "peekOther", playerId: ownerId, slot });
-        else chooseForSwap(ownerId, slot);
+        // A king names both cards before it sees either. The swap-or-keep
+        // question comes afterwards, as two buttons, not as a third click.
+        if (view.kingPicks.length < 2) act({ a: "kingPick", playerId: ownerId, slot });
         return;
       default:
         return;
@@ -192,6 +206,13 @@ export function Table(props: TableProps): React.JSX.Element {
        */
       data-my-turn={myTurn ? "" : undefined}
       data-stopped={view.slapLock !== null ? "" : undefined}
+      /*
+       * A slap that landed, said in the one colour the table does not
+       * otherwise use. The felt takes it rather than any one card, because a
+       * slap is not a thing that happened to a card, it is a thing that
+       * happened to the game - everything stopped.
+       */
+      data-slapped={slapPulse ? "" : undefined}
     >
       <header className="table__bar">
         <span className="table__code">{view.code}</span>
@@ -272,10 +293,11 @@ export function Table(props: TableProps): React.JSX.Element {
             <button
               type="button"
               className="button button--primary"
+              disabled={!studied}
               onClick={() => act({ a: "readyUp" })}
               data-testid="ready-button"
             >
-              Ready
+              {studied ? "Ready" : `Look at your ${INITIAL_PEEKS} bottom cards`}
             </button>
           )}
 
@@ -306,7 +328,7 @@ export function Table(props: TableProps): React.JSX.Element {
             </button>
           )}
 
-          {myTurn && view.pendingPower !== null && view.optionalPowers && (
+          {myTurn && view.pendingPower !== null && view.optionalPowers && view.phase !== "powerKingChoice" && (
             <button
               type="button"
               className="button button--ghost"
@@ -320,10 +342,25 @@ export function Table(props: TableProps): React.JSX.Element {
             </button>
           )}
 
-          {myTurn && view.phase === "powerKing" && view.kingPeeked && view.optionalPowers && (
-            <button type="button" className="button" onClick={() => act({ a: "kingSkip" })} data-testid="king-pass">
-              Keep both cards
-            </button>
+          {/*
+            The king's question, once both its cards are face up. Deciding is
+            the power rather than a way out of it, so these are here at every
+            table, whatever the host set Powers to.
+          */}
+          {myTurn && view.phase === "powerKingChoice" && (
+            <>
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={() => act({ a: "kingSwap" })}
+                data-testid="king-swap"
+              >
+                Swap them
+              </button>
+              <button type="button" className="button" onClick={() => act({ a: "kingSkip" })} data-testid="king-pass">
+                Keep both
+              </button>
+            </>
           )}
         </div>
       </footer>
@@ -360,9 +397,13 @@ function prompt(
     return `Round over - ${winner} wins`;
   }
   if (view.phase === "study") {
-    return mySeat?.ready === true
-      ? "Waiting for the others to finish studying..."
-      : "Look at your two bottom cards, then hit Ready";
+    if (mySeat?.ready === true) return "Waiting for the others to finish studying...";
+    const left = INITIAL_PEEKS - (mySeat?.peeked.length ?? 0);
+    if (left <= 0) return "Remember them, then hit Ready";
+    // Said as a count, because the point of the line is how many are left.
+    return left === 1
+      ? "Look at your other bottom card"
+      : `Look at your ${left} bottom cards - the ones nearest you`;
   }
   if (view.phase === "slapGiveCard") {
     const owed = view.players.find((p) => p.id === view.slapDebt?.targetId)?.name ?? "them";
@@ -388,9 +429,11 @@ function prompt(
         ? "Jack or queen - pick any card on the table"
         : "Now pick the card to swap it with - either hand will do";
     case "powerKing":
-      if (!view.kingPeeked) return "King - look at any card on the table";
-      if (pick !== null) return "Now pick the card to swap it with - either hand will do";
-      return view.optionalPowers ? "Now pick any card to swap, or keep both as they are" : "Now pick any card to swap";
+      return view.kingPicks.length === 0
+        ? "King - pick any two cards on the table"
+        : "Now pick the second card - either hand will do";
+    case "powerKingChoice":
+      return "Swap these two, or keep them where they are?";
     default:
       return "Your turn";
   }

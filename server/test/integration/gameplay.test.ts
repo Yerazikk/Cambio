@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { GameView } from "@cambio/shared";
 import { harness, settled, settledAfter, startGame, type Harness, type TestClient } from "./harness.js";
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 let h: Harness;
 afterEach(async () => {
   await h?.close();
@@ -111,7 +113,7 @@ describe("refreshing the page", () => {
 
     for (const player of view.players) {
       for (const slot of player.slots) {
-        expect(slot.known, `${player.name} slot`).toBe(false);
+        expect(slot.kind, `${player.name} slot`).not.toBe("up");
       }
     }
   });
@@ -155,11 +157,67 @@ describe("refreshing the page", () => {
     expect(error.code).toBe("sessionInvalid");
   });
 
-  it("gives up the seat once the grace period expires", async () => {
-    h = await harness({ graceMs: { inGame: 60, lobby: 60 } });
+  /**
+   * A seat in a round is held to the end of it, with no clock on it at all.
+   * Losing a game to a flaky connection is the worst thing this can do to
+   * somebody, so it does not: the turn order steps over the empty chair and
+   * waits.
+   */
+  it("holds a seat for the whole round, however long the player is gone", async () => {
+    h = await harness({ graceMs: { lobby: 60 } });
     const { clients } = await h.table(["Ana", "Bo", "Cy"]);
     const [ana, bo] = clients;
     await startGame(clients);
+
+    ana!.kill();
+
+    const view = await bo!.waitForState((v) => v.players.some((p) => !p.connected), 3_000);
+    expect(view.players.map((p) => p.name)).toEqual(["Ana", "Bo", "Cy"]);
+
+    // Well past what used to be the grace period, and the seat is still hers.
+    await sleep(300);
+    expect(bo!.latestState()?.players.map((p) => p.name)).toEqual(["Ana", "Bo", "Cy"]);
+  });
+
+  /**
+   * And she can walk back into it with nothing but the code and her name,
+   * which is all a player has after clearing their storage or picking up a
+   * different device.
+   */
+  it("lets a dropped player back into their seat by name", async () => {
+    h = await harness();
+    const { clients, code } = await h.table(["Ana", "Bo"]);
+    const [ana, bo] = clients;
+    await startGame(clients);
+
+    ana!.kill();
+    await bo!.waitForState((v) => v.players.some((p) => !p.connected), 3_000);
+
+    const reborn = await h.connect();
+    reborn.send({ t: "room.join", code, name: "Ana" });
+    const hello = await reborn.next("hello");
+
+    // The same seat, not a new one beside it.
+    const view = await reborn.waitForState((v) => v.players.every((p) => p.connected), 3_000);
+    expect(view.players.map((p) => p.name)).toEqual(["Ana", "Bo"]);
+    expect(hello.playerId).toBe(ana!.playerId);
+  });
+
+  it("refuses to hand over a seat somebody is still sitting in", async () => {
+    h = await harness();
+    const { clients, code } = await h.table(["Ana", "Bo"]);
+    await startGame(clients);
+
+    const impostor = await h.connect();
+    impostor.send({ t: "room.join", code, name: "Ana" });
+    const error = await impostor.next("error");
+    expect(error.code).toBe("nameTaken");
+  });
+
+  it("gives up a lobby seat once its grace period expires", async () => {
+    h = await harness({ graceMs: { lobby: 60 } });
+    const { clients } = await h.table(["Ana", "Bo", "Cy"]);
+    const [ana, bo] = clients;
 
     const token = ana!.token;
     ana!.kill();
@@ -186,9 +244,18 @@ describe("hidden information", () => {
       for (const player of view.players) {
         for (const slot of player.slots) {
           expect(
-            slot.known,
+            slot.kind,
             `${client.playerId} was shown ${player.name}'s card during phase ${view.phase}`,
-          ).toBe(false);
+          ).not.toBe("up");
+        }
+        /*
+         * And the handles a slot is named by must give nothing away either.
+         * The real ids spell the card out - `S7` is the seven of spades - so
+         * sending them would hand over the table's hands to anyone who
+         * opened a console, whatever the faces said.
+         */
+        for (const slot of player.slots) {
+          if (slot.kind !== "gap") expect(slot.id).toMatch(/^c\d+$/);
         }
       }
     }
@@ -219,7 +286,7 @@ describe("hidden information", () => {
 
     const view = clients[0]!.latestState();
     const me = view?.players.find((p) => p.id === clients[0]!.playerId);
-    expect(me?.slots.every((s) => !s.known)).toBe(true);
+    expect(me?.slots.every((s) => s.kind !== "up")).toBe(true);
   });
 
   it("sends a studied card only to the player who studied it", async () => {
@@ -229,7 +296,7 @@ describe("hidden information", () => {
     ana!.send({ t: "lobby.start" });
     await Promise.all(clients.map((c) => c.waitForState((v) => v.phase === "study")));
 
-    ana!.act({ a: "initialPeek", slot: 2 });
+    ana!.act({ a: "initialPeek", slot: 1 });
     const revealed = await ana!.next("card.revealed");
 
     expect(revealed.ownerId).toBe(ana!.playerId);
@@ -263,7 +330,7 @@ describe("hidden information", () => {
 
     const view = await clients[0]!.waitForState((v) => v.phase === "finished", 3_000);
     for (const player of view.players) {
-      expect(player.slots.every((s) => s.known)).toBe(true);
+      expect(player.slots.every((s) => s.kind === "up")).toBe(true);
       expect(player.score).not.toBeNull();
     }
   });
@@ -303,7 +370,13 @@ describe("playing a round through to the end", () => {
     }
   });
 
-  it("plays another round at the same table when the host asks", async () => {
+  /**
+   * Play again goes back to the lobby rather than straight into a deal.
+   * Between rounds is when a table changes its mind - another pack, a
+   * different back, somebody joining or going - and it is where a player who
+   * dropped last round gets picked back up.
+   */
+  it("takes the table back to the lobby when someone plays again", async () => {
     h = await harness();
     const { clients } = await h.table(["Ana", "Bo"]);
     await startGame(clients);
@@ -316,20 +389,29 @@ describe("playing a round through to the end", () => {
 
     clients[0]!.send({ t: "lobby.restart" });
 
-    // Same seats, fresh hands, and scores cleared.
-    const fresh = await clients[0]!.waitForState((v) => v.phase === "study", 3_000);
+    // Same seats, no hands, and last round's scores cleared away.
+    const fresh = await clients[0]!.waitForState((v) => v.phase === "lobby", 3_000);
     expect(fresh.players.map((p) => p.name)).toEqual(["Ana", "Bo"]);
-    expect(fresh.players.every((p) => p.slots.length === 4)).toBe(true);
+    expect(fresh.players.every((p) => p.slots.length === 0)).toBe(true);
     expect(fresh.players.every((p) => p.score === null)).toBe(true);
     expect(fresh.players.every((p) => !p.calledCambio)).toBe(true);
     expect(fresh.winnerId).toBeNull();
-    // And nobody can see anything again.
-    for (const player of fresh.players) {
-      expect(player.slots.every((s) => !s.known)).toBe(true);
+
+    // And the host can deal again from there.
+    clients[0]!.send({ t: "lobby.start" });
+    const dealt = await clients[0]!.waitForState((v) => v.phase === "study", 3_000);
+    expect(dealt.players.every((p) => p.slots.length === 4)).toBe(true);
+    for (const player of dealt.players) {
+      expect(player.slots.every((s) => s.kind !== "up")).toBe(true);
     }
   });
 
-  it("only lets the host play again", async () => {
+  /**
+   * Anyone may do it, not just the host. The round is over, so there is
+   * nothing left to disrupt - and a table whose host has wandered off should
+   * not be stuck staring at a scoreboard for ever.
+   */
+  it("lets a player who is not the host play again", async () => {
     h = await harness();
     const { clients } = await h.table(["Ana", "Bo"]);
     await startGame(clients);
@@ -341,8 +423,8 @@ describe("playing a round through to the end", () => {
     await clients[1]!.waitForState((v) => v.phase === "finished", 3_000);
 
     clients[1]!.send({ t: "lobby.restart" });
-    const error = await clients[1]!.next("error");
-    expect(error.code).toBe("notHost");
+    const fresh = await clients[1]!.waitForState((v) => v.phase === "lobby", 3_000);
+    expect(fresh.players.map((p) => p.name)).toEqual(["Ana", "Bo"]);
   });
 
   it("refuses to play again mid-round", async () => {
@@ -370,8 +452,9 @@ describe("playing a round through to the end", () => {
     const { clients } = await h.table(["Ana", "Bo"]);
     await startGame(clients);
     await takeSafeTurn(clients);
+    await settled(clients);
 
-    const views = await Promise.all(clients.map((c) => c.waitForState(() => true)));
+    const views = clients.map((c) => c.latestState());
     const [first, ...rest] = views;
     for (const view of rest) {
       expect(view.deckCount).toBe(first!.deckCount);

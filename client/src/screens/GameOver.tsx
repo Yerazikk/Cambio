@@ -11,7 +11,6 @@ export function GameOver({ view, me, onRestart, onLeave }: GameOverProps): React
   const ranked = [...view.players].sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
   const winner = view.players.find((p) => p.id === view.winnerId);
   const caller = view.players.find((p) => p.calledCambio);
-  const amHost = view.players.find((p) => p.id === me)?.isHost === true;
 
   return (
     <section className="over" data-testid="game-over">
@@ -30,7 +29,7 @@ export function GameOver({ view, me, onRestart, onLeave }: GameOverProps): React
               {player.name}
               {player.calledCambio && <span className="chip chip--red">Cambié</span>}
               <span className="over__cards">
-                {player.slots.map((slot) => (slot.known ? labelOf(slot.card.rank) : "?")).join("  ")}
+                {player.slots.map((slot) => (slot.kind === "up" ? labelOf(slot.card.rank) : slot.kind === "gap" ? "-" : "?")).join("  ")}
               </span>
             </span>
             <span className="over__score" data-testid={`final-${player.name}`}>
@@ -41,15 +40,15 @@ export function GameOver({ view, me, onRestart, onLeave }: GameOverProps): React
       </ol>
 
       <div className="over__actions">
-        {amHost ? (
-          <button type="button" className="button button--primary" onClick={onRestart} data-testid="play-again">
-            Play again
-          </button>
-        ) : (
-          <p className="over__waiting" data-testid="over-waiting">
-            Waiting for the host to play again&hellip;
-          </p>
-        )}
+        {/*
+          Anyone may do this, and it goes back to the lobby rather than
+          straight into another deal. Between rounds is when a table changes
+          its mind - another pack, a different back, somebody joining - and
+          it is also where a player who dropped last round is picked back up.
+        */}
+        <button type="button" className="button button--primary" onClick={onRestart} data-testid="play-again">
+          Play again
+        </button>
         <button type="button" className="button button--ghost" onClick={onLeave} data-testid="over-leave">
           Leave the table
         </button>

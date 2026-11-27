@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { makeCard, NUMERIC_RANKS, SUITS, cardLabel, type Card } from "@cambio/shared";
+import { makeCard, NUMERIC_RANKS, ROOM_CODE_LENGTH, SUITS, cardLabel, type Card } from "@cambio/shared";
 import { CardFace } from "../components/Card.js";
 
 export type HomeProps = {
@@ -8,13 +8,51 @@ export type HomeProps = {
   disabled: boolean;
 };
 
+/**
+ * Where the name you play under is kept between visits.
+ *
+ * In `localStorage` rather than the `sessionStorage` the seat token uses, and
+ * deliberately: a token belongs to one tab, because two tabs are two players,
+ * but a name belongs to the person at the keyboard and should still be there
+ * tomorrow. It is only ever filled in for them - the field stays editable, so
+ * nobody is stuck with a name they typed once.
+ */
+const NAME_KEY = "cambio.name";
+
+function rememberedName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? "";
+  } catch {
+    // A private window still plays; it just will not recognise you next time.
+    return "";
+  }
+}
+
+function rememberName(name: string): void {
+  try {
+    localStorage.setItem(NAME_KEY, name);
+  } catch {
+    /* nothing to do */
+  }
+}
+
 export function Home({ onCreate, onJoin, disabled }: HomeProps): React.JSX.Element {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(rememberedName);
   const [code, setCode] = useState("");
 
   const trimmed = name.trim();
   const canCreate = trimmed.length > 0 && !disabled;
-  const canJoin = canCreate && code.trim().length === 6;
+  const canJoin = canCreate && code.trim().length === ROOM_CODE_LENGTH;
+
+  /** Sitting down is what makes a name worth keeping, so it is kept here. */
+  const create = (): void => {
+    rememberName(trimmed);
+    onCreate(trimmed);
+  };
+  const join = (): void => {
+    rememberName(trimmed);
+    onJoin(code, trimmed);
+  };
 
   return (
     <main className="home">
@@ -30,8 +68,8 @@ export function Home({ onCreate, onJoin, disabled }: HomeProps): React.JSX.Eleme
         className="home__form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (canJoin) onJoin(code, trimmed);
-          else if (canCreate) onCreate(trimmed);
+          if (canJoin) join();
+          else if (canCreate) create();
         }}
       >
         {/*
@@ -57,7 +95,7 @@ export function Home({ onCreate, onJoin, disabled }: HomeProps): React.JSX.Eleme
             type="button"
             className="button button--primary"
             disabled={!canCreate}
-            onClick={() => onCreate(trimmed)}
+            onClick={create}
             data-testid="create-button"
           >
             Create a table
@@ -73,7 +111,7 @@ export function Home({ onCreate, onJoin, disabled }: HomeProps): React.JSX.Eleme
             <input
               className="field__input field__input--code"
               value={code}
-              onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))}
+              onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, ROOM_CODE_LENGTH))}
               placeholder="CODE"
               aria-label="Table code"
               data-testid="code-input"

@@ -100,9 +100,11 @@ export async function startRound(players: Player[]): Promise<void> {
 
   for (const player of players) {
     await expect(player.page.getByTestId("ready-button")).toBeVisible();
-    // Study the bottom row, which is what the rules allow.
-    await player.slot(2).click();
+    // Study the bottom row - slots 1 and 3, the cards labelled 2 and 4 - which
+    // is what the rules allow and what Ready now waits for.
+    await player.slot(1).click();
     await player.slot(3).click();
+    await expect(player.page.getByTestId("ready-button")).toBeEnabled();
     await player.page.getByTestId("ready-button").click();
   }
 

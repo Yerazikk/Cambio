@@ -14,7 +14,7 @@ describe("creating and joining a table", () => {
     host.send({ t: "room.create", name: "Ana" });
     const hello = await host.next("hello");
 
-    expect(hello.code).toMatch(/^[A-Z2-9]{6}$/);
+    expect(hello.code).toMatch(/^[A-Z2-9]{4}$/);
     expect(hello.playerId).toBeTruthy();
     expect(hello.token).toBeTruthy();
   });
@@ -172,14 +172,16 @@ describe("starting the game", () => {
     clients[0]!.send({ t: "lobby.start" });
     await clients[0]!.waitForState((v) => v.phase === "study");
 
-    clients[0]!.act({ a: "initialPeek", slot: 2 });
+    // The studiable cards are the bottom row - slots 1 and 3, labelled 2 and
+            // 4 on screen - which are the two nearest the player.
+    clients[0]!.act({ a: "initialPeek", slot: 1 });
     const first = await clients[0]!.next("card.revealed");
     expect(first.ownerId).toBe(clients[0]!.playerId);
 
     clients[0]!.act({ a: "initialPeek", slot: 3 });
     await clients[0]!.next("card.revealed");
 
-    clients[0]!.act({ a: "initialPeek", slot: 2 });
+    clients[0]!.act({ a: "initialPeek", slot: 1 });
     const error = await clients[0]!.next("error");
     expect(error.code).toBe("illegalAction");
   });
@@ -380,14 +382,38 @@ describe("starting the game", () => {
     expect(clients[0]!.latestState()?.back).toBe(DEFAULT_BACK);
   });
 
-  it("begins play only once everyone is ready", async () => {
+  /** Looking at your bottom two is now the price of being allowed to start. */
+  it("refuses to call a player ready before they have looked at their cards", async () => {
     h = await harness();
     const { clients } = await h.table(["Ana", "Bo"]);
     clients[0]!.send({ t: "lobby.start" });
     await clients[0]!.waitForState((v) => v.phase === "study");
 
     clients[0]!.act({ a: "readyUp" });
-    const stillStudying = await clients[0]!.waitForState(() => true);
+    const error = await clients[0]!.next("error");
+    expect(error.code).toBe("illegalAction");
+
+    const view = clients[0]!.latestState();
+    expect(view?.players.every((p) => !p.ready)).toBe(true);
+  });
+
+  it("begins play only once everyone is ready", async () => {
+    h = await harness();
+    const { clients } = await h.table(["Ana", "Bo"]);
+    clients[0]!.send({ t: "lobby.start" });
+    await Promise.all(clients.map((c) => c.waitForState((v) => v.phase === "study")));
+
+    for (const client of clients) {
+      for (const slot of [1, 3]) client.act({ a: "initialPeek", slot });
+    }
+    await Promise.all(
+      clients.map((c) =>
+        c.waitForState((v) => (v.players.find((p) => p.id === c.playerId)?.peeked.length ?? 0) === 2),
+      ),
+    );
+
+    clients[0]!.act({ a: "readyUp" });
+    const stillStudying = await clients[0]!.waitForState((v) => v.players.some((p) => p.ready));
     expect(stillStudying.phase).toBe("study");
 
     clients[1]!.act({ a: "readyUp" });

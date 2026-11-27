@@ -15,8 +15,15 @@ export type Seat = {
   id: PlayerId;
   name: string;
   connected: boolean;
-  /** Slot index -> card. Length is variable: slaps shrink it, penalties grow it. */
-  hand: CardId[];
+  /**
+   * Slot index -> card, or null where a card has left.
+   *
+   * A hand never closes up. Slapping a card away or handing one over leaves
+   * the place it held empty, because the alternative - sliding everything
+   * down - moves cards the player has memorised, and remembering where your
+   * cards are is the whole game. Penalties still grow it off the end.
+   */
+  hand: (CardId | null)[];
   /** Which slots this player studied before the first turn, in click order. */
   initialPeeked: number[];
   ready: boolean;
@@ -69,6 +76,15 @@ export type GameState = {
   deck: CardId[];
   discard: CardId[];
   /**
+   * The handle each card is known by off this server.
+   *
+   * A card's real id names it - `S7` is the seven of spades - and a slot goes
+   * to every player at the table, so the real one can never be sent. These are
+   * dealt out of a shuffled list at the start of the round, so a handle says
+   * nothing about the card, its rank, or where in the deck it started.
+   */
+  publicIds: Map<CardId, string>;
+  /**
    * Who has legitimately seen each card, keyed on the card rather than the slot
    * it occupies. Keying on the card is what makes a sight-unseen J/Q swap come
    * out right: knowledge travels with the card into its new hand, instead of
@@ -79,10 +95,17 @@ export type GameState = {
   turnEndsAt: number | null;
   held: Held | null;
   pendingPower: Power | null;
-  /** True once a king's peek is spent, so only the swap-or-skip choice remains. */
-  kingPeeked: boolean;
-  /** Set while a slapper who took another player's card owes them one back. */
-  slapGiveFor: { slapperId: PlayerId; targetId: PlayerId } | null;
+  /**
+   * The cards a king has named, in order. A king names two and is shown both
+   * together before it is asked whether to trade them, so this fills up to two
+   * entries and is then the pair the choice applies to.
+   */
+  kingPicks: { ownerId: PlayerId; slot: number }[];
+  /**
+   * Set while a slapper who took another player's card owes them one back.
+   * `slot` is the hole the slap left, which is where the paid card goes.
+   */
+  slapGiveFor: { slapperId: PlayerId; targetId: PlayerId; slot: number } | null;
   /** Set while the table is stopped on a slap. See SlapLock. */
   slapLock: SlapLock | null;
   cambioCallerId: PlayerId | null;
@@ -116,7 +139,25 @@ export function seatOf(state: GameState, playerId: PlayerId): Seat | undefined {
 export function cardAt(state: GameState, playerId: PlayerId, slot: number): Card | undefined {
   const seat = seatOf(state, playerId);
   const id = seat?.hand[slot];
-  return id === undefined ? undefined : state.cards.get(id);
+  return id === undefined || id === null ? undefined : state.cards.get(id);
+}
+
+/** The cards actually in a hand, with its holes left out. */
+export function handCards(seat: Seat): CardId[] {
+  return seat.hand.filter((id): id is CardId => id !== null);
+}
+
+/**
+ * Whether a hand is empty - which ends the round on the spot. Holes do not
+ * count: a hand of four holes is a hand of no cards.
+ */
+export function handIsEmpty(seat: Seat): boolean {
+  return seat.hand.every((id) => id === null);
+}
+
+/** The card in a slot, or null for a hole and undefined for no such slot. */
+export function slotCardId(seat: Seat, slot: number): CardId | null | undefined {
+  return seat.hand[slot];
 }
 
 export function turnSeat(state: GameState): Seat | undefined {
@@ -177,9 +218,13 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
     calledCambio: seat.calledCambio,
     score: state.scores?.get(seat.id) ?? null,
     slots: seat.hand.map((cardId): SlotView => {
+      // A hole stays a hole, so nobody's hand shifts under them mid-round.
+      if (cardId === null) return { kind: "gap" };
       const card = state.cards.get(cardId);
-      const visible = card !== undefined && (revealAll || (state.rules.serverRemembersPeeks && knows(state, cardId, viewerId)));
-      return visible ? { id: cardId, known: true, card } : { id: cardId, known: false };
+      if (card === undefined) return { kind: "gap" };
+      const visible = revealAll || (state.rules.serverRemembersPeeks && knows(state, cardId, viewerId));
+      const id = publicIdOf(state, cardId);
+      return visible ? { kind: "up", id, card } : { kind: "down", id };
     }),
   }));
 
@@ -211,13 +256,25 @@ export function viewFor(state: GameState, viewerId: PlayerId): GameView {
     heldCard,
     heldFromDiscard: state.held?.fromDiscard ?? false,
     pendingPower: isViewersTurn ? state.pendingPower : null,
-    kingPeeked: state.kingPeeked,
+    // Which cards a king has named is public - the table watches them get
+    // picked up - even though only the king sees what is on them.
+    kingPicks: state.kingPicks.map((pick) => ({ ownerId: pick.ownerId, slot: pick.slot })),
     slapDebt: state.slapGiveFor,
     finalTurnsRemaining: state.finalTurnsRemaining,
     slapOpen: slapOpen(state),
     slapLock: lockView(state),
     winnerId: state.winnerId,
   };
+}
+
+/**
+ * The handle a card is known by off this server.
+ *
+ * Falls back to the real id only for a state that was never dealt - an empty
+ * lobby has no cards to leak - so a round in progress always has one.
+ */
+export function publicIdOf(state: GameState, cardId: CardId): string {
+  return state.publicIds.get(cardId) ?? cardId;
 }
 
 /** The stopped table as the clients see it: who owes a card, and who is next. */

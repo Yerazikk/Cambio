@@ -35,12 +35,25 @@ function outcomeOf(state: GameState, slapperId: string, targetId: string, slot: 
 }
 
 describe("slapping your own card", () => {
-  it("discards it and shrinks your hand", () => {
+  /*
+   * The card goes, and its place stays. A hand that closed up behind a slap
+   * would move every card the player had memorised, which is the one thing a
+   * memory game must never do to them.
+   */
+  it("discards it and leaves a hole where it was", () => {
     const { state, event } = resolve(table(), "ana", "ana", 0);
 
     expect(event.outcome).toBe("ownCardDiscarded");
-    expect(state.seats[0]?.hand).toEqual(["S2", "S3"]);
+    expect(state.seats[0]?.hand).toEqual([null, "S2", "S3"]);
     expect(state.discard).toEqual(["H5", "S5"]);
+  });
+
+  /** The face goes to the whole table: it is on the pile now, so it is public. */
+  it("shows the card it turned over to everyone", () => {
+    const { event, out } = resolve(table(), "ana", "ana", 0);
+
+    expect(event.card?.id).toBe("S5");
+    expect(out.every((o) => o.to === "all")).toBe(true);
   });
 
   it("broadcasts the result to everyone, with the margin", () => {
@@ -60,7 +73,8 @@ describe("slapping your own card", () => {
     const result = resolve(state, "ana", "ana", 0);
 
     expect(result.state.phase).toBe("finished");
-    expect(result.state.seats[0]?.hand).toEqual([]);
+    // A hand of nothing but holes is a hand of no cards.
+    expect(result.state.seats[0]?.hand).toEqual([null]);
     expect(result.state.scores?.get("ana")).toBe(0); // nothing left to score against
     expect(result.state.winnerId).toBe("ana");
     expect(result.out.some((o) => o.event.t === "game.over")).toBe(true);
@@ -72,19 +86,25 @@ describe("slapping someone else's card", () => {
     const { state, event } = resolve(table(), "ana", "bo", 0);
 
     expect(event.outcome).toBe("otherCardDiscarded");
-    expect(state.seats[1]?.hand).toEqual(["C7", "C8"]);
+    expect(state.seats[1]?.hand).toEqual([null, "C7", "C8"]);
     expect(state.discard).toEqual(["H5", "C5"]);
     expect(state.phase).toBe("slapGiveCard");
-    expect(state.slapGiveFor).toEqual({ slapperId: "ana", targetId: "bo" });
+    // The debt remembers which hole it has to fill.
+    expect(state.slapGiveFor).toEqual({ slapperId: "ana", targetId: "bo", slot: 0 });
   });
 
-  it("hands over the card you choose and resumes play", () => {
+  /*
+   * The card you owe goes into the hole you made, not onto the end of their
+   * hand. It is the place it is owed for, and it leaves every other card in
+   * that hand where its owner last saw it.
+   */
+  it("fills the hole it made with the card you choose, and resumes play", () => {
     const slapped = resolve(table(), "ana", "bo", 0).state;
     const result = reduce(slapped, "ana", { a: "slapGive", slot: 1 }, ctx);
     if (!result.ok) throw new Error(result.message);
 
-    expect(result.state.seats[0]?.hand).toEqual(["S5", "S3"]);
-    expect(result.state.seats[1]?.hand).toEqual(["C7", "C8", "S2"]);
+    expect(result.state.seats[0]?.hand).toEqual(["S5", null, "S3"]);
+    expect(result.state.seats[1]?.hand).toEqual(["S2", "C7", "C8"]);
     expect(result.state.slapGiveFor).toBeNull();
     expect(result.state.phase).toBe("awaitingAction");
   });
@@ -134,7 +154,7 @@ describe("slapping someone else's card", () => {
     const result = reduce(slapped, "ana", { a: "slapGive", slot: 0 }, ctx);
     if (!result.ok) throw new Error(result.message);
 
-    expect(result.state.seats[0]?.hand).toEqual([]);
+    expect(result.state.seats[0]?.hand).toEqual([null]);
     expect(result.state.phase).toBe("finished");
   });
 });
@@ -220,8 +240,9 @@ describe("playing a queue of slaps out in order", () => {
 
     const second = resolve(first.state, "bo", "bo", 0);
     expect(second.event.outcome).toBe("ownCardDiscarded");
-    expect(second.state.seats[1]?.hand).toEqual(["C7", "C8"]);
-    // Ana still carries the card her wrong slap cost her.
+    expect(second.state.seats[1]?.hand).toEqual([null, "C7", "C8"]);
+    // Ana still carries the card her wrong slap cost her, on the end of her
+    // hand: a penalty is a card you have been given, not one you got back.
     expect(second.state.seats[0]?.hand).toEqual(["S5", "S2", "S3", "S12"]);
   });
 

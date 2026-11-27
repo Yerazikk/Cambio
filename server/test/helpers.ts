@@ -3,9 +3,11 @@ import {
   DEFAULT_RULES,
   type Card,
   type CardId,
+  type GameView,
   type PlayerId,
   type Phase,
   type RuleConfig,
+  type SlotView,
 } from "@cambio/shared";
 import { orderedCambioDeck } from "../src/deck.js";
 import type { GameState, Seat } from "../src/engine/state.js";
@@ -20,8 +22,11 @@ export function card(id: CardId): Card {
 }
 
 export type Fixture = {
-  /** Seat order is turn order. Values are card ids, in slot order. */
-  hands: Record<PlayerId, CardId[]>;
+  /**
+   * Seat order is turn order. Values are card ids, in slot order, with `null`
+   * for a hole - a place a card has been slapped out of.
+   */
+  hands: Record<PlayerId, (CardId | null)[]>;
   /** Top of the discard pile is the LAST element. */
   discard?: CardId[];
   /** Next card drawn is the LAST element, so `pop()` takes it. */
@@ -29,6 +34,7 @@ export type Fixture = {
   phase?: Phase;
   rules?: Partial<RuleConfig>;
   turnIndex?: number;
+  turnEndsAt?: number | null;
   hostId?: PlayerId;
 };
 
@@ -55,7 +61,7 @@ export function fixture(spec: Fixture): GameState {
     ...seats.flatMap((s) => s.hand),
     ...(spec.discard ?? []),
     ...(spec.deck ?? []),
-  ];
+  ].filter((id): id is CardId => id !== null);
   for (const id of used) card(id);
 
   const duplicates = used.filter((id, i) => used.indexOf(id) !== i);
@@ -72,13 +78,17 @@ export function fixture(spec: Fixture): GameState {
     cards: new Map(ALL_CARDS),
     deck: [...(spec.deck ?? [])],
     discard: [...(spec.discard ?? [])],
+    // Fixtures keep the real ids as handles: a test that reads a slot wants to
+    // see "S7", and nothing it drives is a client that could be leaked to.
+    publicIds: new Map([...ALL_CARDS.keys()].map((id) => [id, id])),
     knownBy: new Map(),
     turnIndex: spec.turnIndex ?? 0,
-    turnEndsAt: null,
+    turnEndsAt: spec.turnEndsAt ?? null,
     held: null,
     pendingPower: null,
-    kingPeeked: false,
+    kingPicks: [],
     slapGiveFor: null,
+    slapLock: null,
     cambioCallerId: null,
     finalTurnsRemaining: null,
     winnerId: null,
@@ -86,12 +96,19 @@ export function fixture(spec: Fixture): GameState {
   };
 }
 
-/** Flatten a view's slots for a given player into "known" card ids, or null where hidden. */
-export function slotFaces(
-  view: { players: { id: PlayerId; slots: ({ known: false } | { known: true; card: Card })[] }[] },
-  playerId: PlayerId,
-): (CardId | null)[] {
+/**
+ * Flatten a view's slots for a given player into the card ids it actually
+ * shows, with null where a face is hidden or the place is a hole.
+ */
+export function slotFaces(view: GameView, playerId: PlayerId): (CardId | null)[] {
   const player = view.players.find((p) => p.id === playerId);
   if (!player) throw new Error(`no such player in view: ${playerId}`);
-  return player.slots.map((s) => (s.known ? s.card.id : null));
+  return player.slots.map((s) => (s.kind === "up" ? s.card.id : null));
+}
+
+/** Where a hand has holes, as seen from a view. */
+export function slotKinds(view: GameView, playerId: PlayerId): SlotView["kind"][] {
+  const player = view.players.find((p) => p.id === playerId);
+  if (!player) throw new Error(`no such player in view: ${playerId}`);
+  return player.slots.map((s) => s.kind);
 }

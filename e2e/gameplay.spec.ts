@@ -110,11 +110,11 @@ test.describe("playing by clicking", () => {
     await ana!.page.getByTestId("start-button").click();
     await expect(ana!.page.getByTestId("ready-button")).toBeVisible();
 
-    await ana!.slot(2).click();
+    await ana!.slot(1).click();
     // The peek is shown to this player...
-    await expect(ana!.slot(2)).toHaveClass(/card--up/);
+    await expect(ana!.slot(1)).toHaveClass(/card--up/);
     // ...and then taken away again, because remembering it is the game.
-    await expect(ana!.slot(2)).not.toHaveClass(/card--up/, { timeout: 15_000 });
+    await expect(ana!.slot(1)).not.toHaveClass(/card--up/, { timeout: 15_000 });
 
     for (const player of players) await player.close();
   });
@@ -175,18 +175,25 @@ test.describe("calling Cambio", () => {
       await playSafeTurn(players);
     }
 
-    // Only the host can play again; the others are told to wait.
+    // Anyone may play again - the round is over, so there is nothing left to
+    // disrupt, and a table whose host has gone should not be stuck here.
     await expect(ana!.page.getByTestId("play-again")).toBeVisible();
-    await expect(bo!.page.getByTestId("play-again")).toHaveCount(0);
-    await expect(bo!.page.getByTestId("over-waiting")).toBeVisible();
+    await expect(bo!.page.getByTestId("play-again")).toBeVisible();
 
-    await ana!.page.getByTestId("play-again").click();
+    await bo!.page.getByTestId("play-again").click();
 
-    // Both players land back in the study phase with a fresh hand.
+    // It goes back to the lobby rather than dealing: between rounds is when a
+    // table changes its pack, its cards, or who is sitting at it.
     for (const player of players) {
       await expect(player.page.getByTestId("game-over")).toHaveCount(0);
+      await expect(player.page.getByTestId("room-code")).toBeVisible();
+    }
+
+    // And the host can deal again from there.
+    await ana!.page.getByTestId("start-button").click();
+    for (const player of players) {
       await expect(player.page.getByTestId("ready-button")).toBeVisible();
-      await expect(player.page.getByTestId("prompt")).toContainText(/look at your two bottom cards/i);
+      await expect(player.page.getByTestId("prompt")).toContainText(/look at your 2 bottom cards/i);
     }
 
     for (const player of players) await player.close();

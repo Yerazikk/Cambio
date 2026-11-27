@@ -103,7 +103,7 @@ function Rules({ optionalPowers }: { optionalPowers: boolean }): React.JSX.Eleme
         <dt>J Q</dt>
         <dd>Swap any two cards on the table</dd>
         <dt>K</dt>
-        <dd>Look at any card, then swap any two{optionalPowers ? " \u2014 or pass" : ""}</dd>
+        <dd>Look at any two cards, then choose whether to swap them</dd>
       </dl>
 
       <h3 className="help__h">Points</h3>
@@ -132,6 +132,7 @@ function Rules({ optionalPowers }: { optionalPowers: boolean }): React.JSX.Eleme
         <li>Draw from the deck, or take the face-up discard.</li>
         <li>A drawn card goes into your hand, or onto the pile &mdash; where it fires its power.</li>
         <li>A taken card must go into your hand, and fires nothing.</li>
+        <li>Every move you make puts more time back on the clock, so a turn with a power in it is not rushed.</li>
       </ul>
 
       <h3 className="help__h">Slapping</h3>
@@ -143,8 +144,14 @@ function Rules({ optionalPowers }: { optionalPowers: boolean }): React.JSX.Eleme
           <strong>The table stops until you turn a card over.</strong> Nobody plays, and the clock on the turn you
           interrupted is held where it was.
         </li>
-        <li>Right, and your card goes. Right on somebody else&rsquo;s, and you owe them one of yours.</li>
-        <li>Wrong, or too slow to pick, and you take a card.</li>
+        <li>
+          Right, and your card goes face up for everyone and leaves a hole where it was. Right on somebody
+          else&rsquo;s, and you owe them one of yours &mdash; it fills the hole you just made in their hand.
+        </li>
+        <li>
+          <strong>There is no clock on picking.</strong> The table waits for you.
+        </li>
+        <li>Wrong, and you take a card.</li>
         <li>Empty your hand and the round ends on the spot.</li>
       </ul>
 

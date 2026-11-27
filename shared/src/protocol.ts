@@ -30,6 +30,15 @@ export type Action =
    * theirs, or one of each.
    */
   | { a: "freeSwap"; aId: PlayerId; aSlot: number; bId: PlayerId; bSlot: number }
+  /**
+   * One of the two cards a king names. The king does not look and then decide
+   * what to do about it - it picks both cards first, is shown them together,
+   * and only then asks whether to trade them.
+   */
+  | { a: "kingPick"; playerId: PlayerId; slot: number }
+  /** Trade the two cards the king looked at. */
+  | { a: "kingSwap" }
+  /** Having seen both, leave them where they are. */
   | { a: "kingSkip" }
   /**
    * Decline a power outright. Legal only at a table whose host has made powers
@@ -112,16 +121,35 @@ export type Phase =
   | "powerPeekOwn"
   | "powerPeekOther"
   | "powerFreeSwap"
+  /** A king, still naming the two cards it will look at. */
   | "powerKing"
+  /** A king that has shown its two cards and is waiting on swap-or-keep. */
+  | "powerKingChoice"
   | "slapGiveCard"
   | "finished";
 
 /**
- * One card as a given viewer sees it. Faces appear only where that viewer is
- * entitled to them: at the final reveal, or — when the server is configured to
- * remember peeks — for cards they have legitimately seen.
+ * One place in a hand, as a given viewer sees it.
+ *
+ * Faces appear only where that viewer is entitled to them: at the final
+ * reveal, or — when the server is configured to remember peeks — for cards
+ * they have legitimately seen.
+ *
+ * `id` is deliberately *not* the card's real id. Internally a card is called
+ * `S7` or `H13`, which names it outright, and a slot is sent to every player
+ * at the table - so sending the real one would hand the whole table's hands to
+ * anyone who opened a console. It is a per-round handle instead: stable for as
+ * long as the card is on the table, and worth nothing off it.
  */
-export type SlotView = { id: CardId } & ({ known: false } | { known: true; card: Card });
+export type SlotView =
+  /**
+   * A card that has left this hand - slapped away, or handed over to settle
+   * someone else's slap. The place it held stays, because a hand that closed
+   * up behind it would move every card a player had memorised.
+   */
+  | { kind: "gap" }
+  | { kind: "down"; id: string }
+  | { kind: "up"; id: string; card: Card };
 
 export type PlayerView = {
   id: PlayerId;
@@ -142,6 +170,9 @@ export type PlayerView = {
    */
   peeked: number[];
 };
+
+/** One card, named by where it sits rather than by its id. */
+export type SlotRef = { ownerId: PlayerId; slot: number };
 
 export type GameView = {
   code: RoomCode;
@@ -187,13 +218,18 @@ export type GameView = {
   /** The power awaiting resolution, if any. */
   pendingPower: Power | null;
   /**
-   * For a king: whether its look has been spent, so only the swap-or-pass
-   * choice remains. In the view rather than client-local state, so a refresh
-   * mid-power does not lose track of where the turn is.
+   * For a king: the cards it has named so far, in the order they were named.
+   * Two of them means both have been shown and only swap-or-keep is left.
+   *
+   * In the view rather than client-local state, so a refresh mid-power does
+   * not lose track of where the turn is.
    */
-  kingPeeked: boolean;
-  /** Who owes whom a card after slapping someone else's. */
-  slapDebt: { slapperId: PlayerId; targetId: PlayerId } | null;
+  kingPicks: SlotRef[];
+  /**
+   * Who owes whom a card after slapping someone else's, and the place in the
+   * target's hand it has to go: the hole the slap just made in it.
+   */
+  slapDebt: { slapperId: PlayerId; targetId: PlayerId; slot: number } | null;
   /** Non-null once someone calls Cambio: how many final turns remain. */
   finalTurnsRemaining: number | null;
   /** Whether a slap is legal right now. */
@@ -213,9 +249,6 @@ export type GameView = {
   } | null;
   winnerId: PlayerId | null;
 };
-
-/** One card, named by where it sits rather than by its id. */
-export type SlotRef = { ownerId: PlayerId; slot: number };
 
 /**
  * What a move looked like from across the table.
@@ -294,6 +327,14 @@ export type ServerEvent =
       targetId: PlayerId;
       slot: number;
       outcome: SlapOutcome;
+      /**
+       * The card that was turned over, for a slap that landed.
+       *
+       * Everyone sees it, not just the slapper: it went face up onto the pile
+       * in front of the whole table, so there is nothing left to hide, and
+       * watching it happen is most of the fun of someone else slapping.
+       */
+      card: Card | null;
       /** On `lostRace`, whose correct slap ended the queue. Null otherwise. */
       endedById: PlayerId | null;
       /**

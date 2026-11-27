@@ -47,15 +47,18 @@ be changed at any point, mid-round included. The artwork lives in
 `K` = **-1**, and jokers = 0. The deck is 54 cards.
 
 **Slapping.** At any time, if a card in any hand matches the rank of the discard
-top, you can slap it. Hit your own and it leaves your hand. Hit someone else's
-and theirs is discarded, but you owe them one of yours. Get the rank wrong and
-you take a penalty card. Empty your hand and the round ends on the spot.
+top, you can slap it. Hit your own and it goes face up for the whole table and
+leaves a hole where it was - a hand never closes up, because sliding it along
+would move cards their owner had memorised. Hit someone else's and theirs is
+discarded, but you owe them one of yours, which fills the hole you just made.
+Get the rank wrong and you take a penalty card. Empty your hand and the round
+ends on the spot.
 
 Slapping stops the table. From the moment you slap, nobody draws and nobody
 plays until you have turned a card over — and the clock on the turn you
-interrupted is held where it was, so nobody loses their turn to your slap. Take
-longer than eight seconds to pick and it costs you a card, which is what stops
-SLAP from being a free way to freeze the game.
+interrupted is held where it was, so nobody loses their turn to your slap. There
+is no clock on picking: the table simply waits. What keeps it from waiting for
+ever is the slapper leaving, which gives their slap up.
 
 Slapping at the same moment as somebody else is a queue, not a duel: a faster
 slap does not cancel a slower one, it only goes first. If the slap ahead of

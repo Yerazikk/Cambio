@@ -6,7 +6,7 @@ test.describe("the lobby", () => {
     const host = await Player.open(browser, "Ana");
     const code = await host.createTable();
 
-    expect(code).toMatch(/^[A-Z2-9]{6}$/);
+    expect(code).toMatch(/^[A-Z2-9]{4}$/);
     await expect(host.page.getByTestId("lobby-player-Ana")).toBeVisible();
     await expect(host.page.getByTestId("start-button")).toBeVisible();
     await host.close();
@@ -36,7 +36,7 @@ test.describe("the lobby", () => {
 
   test("rejects a code that belongs to no table", async ({ browser }) => {
     const player = await Player.open(browser, "Ana");
-    await player.page.getByTestId("code-input").fill("ZZZZZZ");
+    await player.page.getByTestId("code-input").fill("ZZZZ");
     await player.page.getByTestId("join-button").click();
 
     await expect(player.page.getByTestId("toast")).toContainText(/no room/i);
@@ -160,7 +160,7 @@ test.describe("the lobby", () => {
     await players[0]!.page.getByTestId("start-button").click();
 
     for (const player of players) {
-      await expect(player.page.getByTestId("prompt")).toContainText(/look at your two bottom cards/i);
+      await expect(player.page.getByTestId("prompt")).toContainText(/look at your 2 bottom cards/i);
       await expect(player.page.getByTestId("deck")).toBeVisible();
       // Four cards each, all face down.
       for (let slot = 0; slot < 4; slot++) {
@@ -176,17 +176,44 @@ test.describe("the lobby", () => {
     await ana!.page.getByTestId("start-button").click();
     await expect(ana!.page.getByTestId("ready-button")).toBeVisible();
 
-    // The top row is not offered at all - only the bottom two are clickable.
+    /*
+     * A hand is dealt in columns of two, so the bottom row is the odd slots:
+     * 1 and 3, which are the cards labelled 2 and 4 and the two nearest the
+     * player. The top row is not offered at all.
+     */
     await expect(ana!.slot(0)).not.toHaveClass(/card--targetable/);
-    await expect(ana!.slot(1)).not.toHaveClass(/card--targetable/);
-    await expect(ana!.slot(2)).toHaveClass(/card--targetable/);
+    await expect(ana!.slot(2)).not.toHaveClass(/card--targetable/);
+    await expect(ana!.slot(1)).toHaveClass(/card--targetable/);
+    await expect(ana!.slot(3)).toHaveClass(/card--targetable/);
 
-    await ana!.slot(2).click();
+    await ana!.slot(1).click();
     await ana!.slot(3).click();
 
     // Both are spent, so neither is offered any more.
-    await expect(ana!.slot(2)).not.toHaveClass(/card--targetable/);
+    await expect(ana!.slot(1)).not.toHaveClass(/card--targetable/);
     await expect(ana!.slot(3)).not.toHaveClass(/card--targetable/);
+
+    for (const player of players) await player.close();
+  });
+
+  /*
+   * The two cards you start the round knowing are the hand you play from, so
+   * declaring yourself ready without having looked is not allowed - and the
+   * button says so rather than silently refusing.
+   */
+  test("will not let a player ready up before they have looked", async ({ browser }) => {
+    const { players } = await seatTable(browser, ["Ana", "Bo"]);
+    const [ana] = players;
+    await ana!.page.getByTestId("start-button").click();
+
+    await expect(ana!.page.getByTestId("ready-button")).toBeDisabled();
+    await expect(ana!.page.getByTestId("ready-button")).toContainText(/look at your/i);
+
+    await ana!.slot(1).click();
+    await expect(ana!.page.getByTestId("ready-button")).toBeDisabled();
+
+    await ana!.slot(3).click();
+    await expect(ana!.page.getByTestId("ready-button")).toBeEnabled();
 
     for (const player of players) await player.close();
   });
@@ -197,10 +224,14 @@ test.describe("the lobby", () => {
     await ana!.page.getByTestId("start-button").click();
 
     await expect(ana!.page.getByTestId("ready-button")).toBeVisible();
+    await ana!.slot(1).click();
+    await ana!.slot(3).click();
     await ana!.page.getByTestId("ready-button").click();
     await expect(ana!.page.getByTestId("prompt")).toContainText(/waiting for the others/i);
 
     await expect(bo!.page.getByTestId("ready-button")).toBeVisible();
+    await bo!.slot(1).click();
+    await bo!.slot(3).click();
     await bo!.page.getByTestId("ready-button").click();
 
     await expect(ana!.page.getByTestId("table")).toHaveAttribute("data-my-turn", "");

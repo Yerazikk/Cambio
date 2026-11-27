@@ -54,6 +54,8 @@ export type GameStore = {
   slapArmed: boolean;
   /** Set the instant a slap is sent, for feedback that does not wait for the server. */
   slapPending: boolean;
+  /** True while the table is still flashing red from a slap that landed. */
+  slapPulse: boolean;
   pick: PickOne;
 
   createRoom: (name: string) => void;
@@ -82,8 +84,22 @@ export type GameStore = {
 };
 
 const TOAST_MS = 3_500;
-/** How long a move stays visible as an animation. Long enough to catch across the table. */
-const FLASH_MS = 1_100;
+/**
+ * How long a move stays visible as an animation.
+ *
+ * Generous, on purpose. This is the only way anyone finds out what another
+ * player just did: the game is face down, so a card lighting up for a moment
+ * is the entire report. A flash short enough to miss while you were looking
+ * at your own hand may as well not have happened.
+ */
+const FLASH_MS = 2_600;
+/**
+ * How long a slapped card stays face up for the whole table.
+ *
+ * It went onto the pile in front of everyone, so there is nothing left to
+ * hide - and a slap is the one moment in the game worth watching land.
+ */
+const SLAP_REVEAL_MS = 2_600;
 /** How many past moves the table log keeps on screen. */
 const LOG_LINES = 5;
 /**
@@ -105,6 +121,8 @@ export function useGame(): GameStore {
   const [dealing, setDealing] = useState(false);
   const [slapArmed, setSlapArmed] = useState(false);
   const [slapPending, setSlapPending] = useState(false);
+  /** When the red the table flashes on a landed slap finishes fading. */
+  const [slapPulse, setSlapPulse] = useState(0);
   const [pick, setPick] = useState<PickOne>(null);
 
   const connection = useRef<Connection | null>(null);
@@ -216,6 +234,21 @@ export function useGame(): GameStore {
             markFlash("slap", [{ ownerId: event.targetId, slot: event.slot }]);
             if (event.outcome !== "wrongRankPenalty") markPile("discard");
           }
+          /*
+           * A slap that landed turns its card face up for everybody, in the
+           * place it was slapped out of, before the hole it left settles.
+           * The server sends the face to the whole table for exactly this:
+           * the card is on the discard pile now, so it is nobody's secret,
+           * and watching it turn over is the point of someone else slapping.
+           */
+          if (event.card !== null) {
+            const card = event.card;
+            setReveals((current) => [
+              ...current.filter((r) => !(r.ownerId === event.targetId && r.slot === event.slot)),
+              { ownerId: event.targetId, slot: event.slot, card, expiresAt: Date.now() + SLAP_REVEAL_MS },
+            ]);
+            setSlapPulse(Date.now() + SLAP_REVEAL_MS);
+          }
           pushToast(...describeSlap(event, namesRef.current, meRef.current));
           return;
         }
@@ -298,6 +331,13 @@ export function useGame(): GameStore {
     return () => clearTimeout(timer);
   }, [piles]);
 
+  /** The red fades on its own; this is what takes the class back off. */
+  useEffect(() => {
+    if (slapPulse <= Date.now()) return;
+    const timer = setTimeout(() => setSlapPulse(0), slapPulse - Date.now());
+    return () => clearTimeout(timer);
+  }, [slapPulse]);
+
   /** The deal is over once the last card has reached the last seat. */
   useEffect(() => {
     if (!dealing) return;
@@ -374,6 +414,7 @@ export function useGame(): GameStore {
       dealing,
       slapArmed,
       slapPending,
+      slapPulse: slapPulse > Date.now(),
       pick,
       createRoom: (name) => send({ t: "room.create", name }),
       joinRoom: (code, name) => send({ t: "room.join", code: code.trim().toUpperCase(), name }),
@@ -411,6 +452,7 @@ export function useGame(): GameStore {
       dealing,
       slapArmed,
       slapPending,
+      slapPulse,
       pick,
       send,
       act,
